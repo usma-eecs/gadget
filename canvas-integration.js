@@ -1,16 +1,4 @@
-// ==UserScript==
-// @name         integration.js
-// @namespace    http://tampermonkey.net/
-// @version      0.1
-// @description  try to take over the world!
-// @author       You
-// @match        https://westpoint.test.instructure.com/*
-// @grant        none
-// ==/UserScript==
-setTimeout(function() {
-
-
-  // we only render gadgets within the context of a course
+// we only render gadgets within the context of a course
 var match = document.location.pathname.match(/^\/courses\/(\d+)/);
 
 if (match && !document.location.search.match('badgadget')) {
@@ -31,17 +19,6 @@ if (match && !document.location.search.match('badgadget')) {
   }
 
   console.log("master: ", CONTEXT);
-
-  const iframe = $('<iframe>', {
-    height: 350,
-    width: '100%',
-    frameborder: 0,
-    marginwidth: 0,
-    marginheight: 0,
-    class: 'gadget',
-    allowfullscreen: true,
-    src: 'https://usma-eecs.github.io/gadget/'
-  });
 
   // sends a message to an gadget and processes responses
   var send = function(gadget, message, callback) {
@@ -96,6 +73,7 @@ if (match && !document.location.search.match('badgadget')) {
         $('<pre/>')
           .text(config.description)
           .attr('id', 'instructions.md')
+          .hide()
       );
     }
   }
@@ -134,9 +112,19 @@ if (match && !document.location.search.match('badgadget')) {
 
       // replace the div contents with an iframe
       $('pre', div).hide();
-      $(div).append(iframe);
+      
+      var gadget = $('<iframe>', {
+        height: 350,
+        width: '100%',
+        frameborder: 0,
+        marginwidth: 0,
+        marginheight: 0,
+        class: 'gadget',
+        allowfullscreen: true,
+        src: 'https://usma-eecs.github.io/gadget/'
+      });
 
-      var gadget = $('iframe', div).get(0);
+      $(div).append(gadget);
       
       var message = { 
         type: 'init', 
@@ -147,85 +135,127 @@ if (match && !document.location.search.match('badgadget')) {
       // pass the new iframe its gadget code
       // if a callback was given, updates will be sent 
       // to it whenever the gadget changes
-      send(gadget, message, callback);
+      send(gadget.get(0), message, callback);
     }
   }
 
-  var hookTinyMCE = editor => {
-  console.log('master: hooking editor ' + editor.id);
-
-  var editorGadgetfy = event => {
-    $('div.gadget', editor.getDoc()).each(function() {
-      render(this, false, "owner", update => { 
-        unpackUpdate(update, div);
-      });
+  // this grabs the default gadget and caches it
+  const defaultGadget = (callback) => {
+    defaultGadget.template = defaultGadget.template || $.get(
+      'https://usma-eecs.github.io/gadget/template.html'
+    )
+    defaultGadget.template.then((html) => {
+      // insert a blank paragraph after the gadget or following
+      // elements will inherit the 'gadget' class
+      callback(html + "<p>&nbsp;</p>");
     });
   }
 
-  if (editor.initialized) {
-    editorGadgetfy()
-  }
+  var hookTinyMCE = editor => {
+    console.log('master: hooking editor ' + editor.id);
+  
+    var renderGadgets = event => {
+      var doc = editor.getDoc();
+      var gadgets = $('div.gadget', doc).not(":has(iframe.gadget)");
+      
+      gadgets.each(function() {
+        render(this, false, "owner", update => { 
+          unpackUpdate(update, this);
+        });
+      });
+    }
 
-  // loading an gadget
-  editor.on('init', editorGadgetfy);
-  editor.on('LoadContent', editorGadgetfy);
+    var addButton = () => {
+      var button = $("<div>", { 
+          role: 'button',
+          class: 'mce-widget mce-btn',
+        }).append($("<button>", { 
+          role: 'presentation',
+          type:'button'
+        }).append($("<i>")
+          .addClass("mce-ico mce-i-none")
+          .css("background-image", "url('https://usma-eecs.github.io/gadget/img/editor-icon.png')")
+        )
+      );
+  
+      button.click(() => {
+        defaultGadget(gadget => editor.insertContent(gadget));
+        setTimeout(renderGadgets, 500);
+      });
 
-  // saving a gadget
-  editor.on('PreProcess', e => {
-    $('div.gadget > iframe', e.node).remove();
-  });
+      var container = $(editor.getElement()).siblings('.mce-container');
+      
+      $('.mce-btn:has(.mce-i-rtl)', container).remove();
+      $('.mce-btn:has(.mce-i-ltr)', container).replaceWith(button);
+    }
+  
+    if (editor.initialized) {
+      addButton()
+      renderGadgets()
+    }
+  
+    editor.on('init', () => { 
+      addButton();
+      renderGadgets(); 
+    });
+  
+    // render gadgets after loading content
+    editor.on('LoadContent', renderGadgets);
+  
+    // remove the rendered gadget iframe when saving
+    editor.on('PreProcess', e => {
+      $('div.gadget > iframe', e.node).remove();
+      $('div.gadget > #instructions\\.md', e.node).show();
+    });
   }
 
   // we are taking or previewing a quiz
   if (ENV.QUIZ && (ENV.IS_PREVIEW || ENV.QUIZ.locked_for_user == false)) {
-  console.log("master: ignoring gadgets in tinymce editors");
+    console.log("master: ignoring gadgets in tinymce editors");
   } else {
-  var watchForTinyMCE = setInterval(function() {
-    if (typeof tinymce !== 'undefined') {
-      clearInterval(watchForTinyMCE);
-      tinymce.get().forEach(hookTinyMCE);
-
-      tinymce.on('AddEditor', instance => { 
-        hookTinyMCE(instance.editor) 
-      });
-    }
-  }, 100);
+    var watchForTinyMCE = setInterval(function() {
+      if (typeof tinymce !== 'undefined') {
+        clearInterval(watchForTinyMCE);
+        tinymce.get().forEach(hookTinyMCE);
+  
+        tinymce.on('AddEditor', instance => { 
+          hookTinyMCE(instance.editor) 
+        });
+      }
+    }, 100);
   }
 
   // this is our main gadget-fication routine
   $(function() {
-  if (CONTEXT.TAKING_QUIZ) {
-    $('div.gadget').each(function() {
-      var question = $(this).closest('.question');
-      $('.answers', question).hide();
+    if (CONTEXT.TAKING_QUIZ) {
+      $('div.gadget').each(function() {
+        var question = $(this).closest('.question');
+        $('.answers', question).hide();
 
-      var question_input = question.find('.question_input').get(0);
-      var div = $('<div class="gadget">').get(0);
-      
-      // find the editor for this question
-      render(this, false, 'guest', update => {
-        unpackUpdate(update, div);
-        tinymce.get(question_input.id).setContent(div.outerHTML);
-      });
-    });
-  } else {
-    $('div.gadget').not(":has(iframe.gadget)").each(function() { 
-      render(this, CONTEXT.EDITING_QUIZ, 'guest');
-    });
-
-    // the quiz editor injects gadgets in such a way that we can't
-    // detect them through events
-    if (CONTEXT.EDITING_QUIZ) {
-      console.log("checking for gadgets");
-      setInterval(() => {
-        $('div.gadget').not(":has(iframe.gadget)").each(function() { 
-          render(this, CONTEXT.EDITING_QUIZ, 'guest');
+        var question_input = question.find('.question_input').get(0);
+        var div = $('<div class="gadget">').get(0);
+        
+        // find the editor for this question
+        render(this, false, 'guest', update => {
+          unpackUpdate(update, div);
+          tinymce.get(question_input.id).setContent(div.outerHTML);
         });
-      }, 1000);
+      });
+    } else {
+      $('div.gadget').not(":has(iframe.gadget)").each(function() { 
+        render(this, CONTEXT.EDITING_QUIZ, 'guest');
+      });
+
+      // the quiz editor injects gadgets in such a way that we can't
+      // detect them through events
+      if (CONTEXT.EDITING_QUIZ) {
+        console.log("checking for gadgets");
+        setInterval(() => {
+          $('div.gadget').not(":has(iframe.gadget)").each(function() { 
+            render(this, CONTEXT.EDITING_QUIZ, 'guest');
+          });
+        }, 1000);
+      }
     }
-  }
   });
 }
-
-
-}, 1000);
