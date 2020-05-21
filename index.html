@@ -1,0 +1,341 @@
+
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+    <title>Gadget</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <link rel="stylesheet" type="text/css" href="css/embed.css">
+    <link rel="stylesheet" type="text/css" href="libs/highlight.js/8.0/styles/github.min.css">
+    <link rel="stylesheet" type="text/css" href="libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+    <script src='libs/jszip/3.1.4/dist/jszip.min.js'></script>
+    <script src='libs/jsdiff/1.0.8/diff.js'></script>
+    <script src="libs/jquery/3.3.1/jquery.min.js" type="text/javascript"></script>
+    <script src="libs/modernizr/2.8.2/modernizr.min.js" type="text/javascript"></script>
+    <script src="libs/detectizr/dist/detectizr.min.js" type="text/javascript"></script>
+    <script src="libs/crypto-js/3.1.2/rollups/md5.js" type="text/javascript"></script>
+    <script type="text/javascript" src="libs/diff_match_patch/20121119/diff_match_patch.js"></script>
+
+    <!--[if lte IE 9]>
+    <script type="text/javascript" src="/js/vendor/jQuery.XDomainRequest.js"></script>
+    <![endif]-->
+  
+    <script type="text/javascript">
+        gadget = {
+            config: {
+                apphostname: 'it105.army',
+                usersubdomains: true,
+                protocol: 'https',
+                cachePrefix: 'cache-prefix-',
+                prefixes: {
+                    "components": "cache-prefix-bf90cd25",
+                    "js": "cache-prefix-28aa2534",
+                    "css": "cache-prefix-28aa2534",
+                    "img": "cache-prefix-28aa2534",
+                    "fonts": "cache-prefix-28aa2534",
+                    "partials": "cache-prefix-28aa2534",
+                    "skulpt": "485c5ea6",
+                    "pypyjs": "cache-prefix-e8e5bcf1"
+                },
+                components: {
+                    "ace-builds": "v1.2.6.1rc2",
+                    "anchor-js": "2.0.0",
+                    "angular-file-saver": "1.1.3",
+                    "angular-load": "0.1.2",
+                    "angular-notifyjs": "0.1.0",
+                    "angular-ui-router": "0.2.11",
+                    "angular-ui-tree": "2.0.10",
+                    "angular-ui-utils": "0.1.1",
+                    "angular-xeditable": "0.1.8",
+                    "bluebird": "3.5.1",
+                    "d3": "3.4.11",
+                    "filereader": "107f68c3b9",
+                    "file-saver.js": "1.20150507.2",
+                    "font-mfizz": "2.0.1",
+                    "gsap": "1.15.0",
+                    "jquery-ui": "libs/jqueryui/1.12.1",
+                    "jsdiff": "1.0.8",
+                    "jszip": "3.1.4",
+                    "lazysizes": "1.5.0",
+                    "lodash": "2.4.1",
+                    "modernizr": "2.7.2",
+                    "ng-file-upload": "1.2.6",
+                    "ngInfiniteScroll": "1.1.2",
+                    "notifyjs": "0.4.2",
+                    "opal": "0.6.2",
+                    "restangular": "1.3.1",
+                    "video.js": "5.20.4",
+                    "yamljs": "0.1.5"
+                }
+            }
+        };
+    </script>
+</head>
+
+<body id="embed_content_python" data-no-metrics="false" data-assignment="false" data-view-only="false" class="mode-standard  remixable" data-is-mobile="false">
+
+    <script>
+      if ((typeof gadgetObject === 'undefined') || !gadgetObject) { 
+        gadgetObject = {
+            settings: {},
+            description: ''
+        } 
+      }
+    </script>
+
+<!-- this can used to make urllib.requests work like in python -->
+    <!-- <input id="proxy" type='hidden' value='https://gadget.io/proxy'/> -->
+
+    <div id="wrapper" class="off-canvas-wrap owner-view row" data-offcanvas>
+        <div class="gadget-wrapper inner-wrap">
+            <nav id="menu" class="gadget-header " data-interface="top-menu">
+                <section class="mode-toolbar left" data-mode="interact" role="menubar">
+                    <div class="icon-bar label-right">
+                        <a class="edit-it menu-button item allow-original show-for-small-only" data-action="code.edit" title="Edit the code.">
+                            <i class="fa fa-pencil"></i>
+                            <label class="show-for-large-up">Code</label>
+                        </a>
+                      
+                        <a class="button run-it menu-button item split allow-original" data-action="code.run" title="View the result." role="button" aria-label="Run Button" tabindex="0">
+                            <i class="fa fa-play"></i>
+                            <label class="show-for-large-up">Run</label>
+                            <span data-dropdown="run-options" data-options="align:bottom" role="menu"></span>
+                        </a>
+
+                        <a class="check-it menu-button item allow-original hide" data-action="code.check" title="Check your code." tabindex="0">
+                            <i class="fa fa-check-circle"></i>
+                            <label class="show-for-large-up">Check</label>
+                        </a>
+
+                        <a class="button fullscreen-it menu-button item allow-original" data-action="mode.fullscreen" role="button" aria-label="Fullscreen" tabindex="0">
+                            <i class="fa fa-expand"></i>
+                            <label class="show-for-large-up">Fullscreen</label>
+                        </a>
+
+                        <a class="button reset-it menu-button item allow-original hide" data-action="code.reset" role="button" aria-label="Reset" tabindex="0">
+                            <i class="fa fa-refresh"></i>
+                            <label class="show-for-large-up">Reset</label>
+                        </a>
+
+                        <a class='menu-button font-size item allow-original' data-action="code.fontsize" onclick="var swap=$(this).data('data'); $(this).data('data',$(this).data('last')); $(this).data('last',swap)" data-last="2em" data-data="1em">
+                          aA
+                          <label class="show-for-large-up">Font</label>
+                        </a>
+                    </div>
+                </section>
+                <section class="mode-indicator right">
+                  <div class="icon-bar">
+                    <div class="item"><div id="draftMessage" class="hide draft-message"></div></div>
+                    <!-- user, has remix, viewing remix -->
+                    <a title="Save changes" class="save-it menu-button allow-original item blue-highlight disabled hide" data-action="menu.upgrade">
+                      <i class="fa fa-save"></i>
+                      <label class="show-for-medium-up">Saved</label>
+                    </a>
+
+                  </div>
+                </section>
+            </nav>
+
+            <section class="gadget-content main-section" data-interface="content">
+                <div id="flashMessage" class="container hide">
+                    <div id="flashContent"></div>
+                </div>
+                <div class="gadget-content-wrapper " role="main">
+                    <div id="content-overlay" class="hide" data-interface="overlay"></div>
+                    <!-- autorun: code / result / check -->
+                    <input id="start-value" type='hidden' value='code' />
+                    <!-- console / result -->
+                    <input id="runMode-value" type='hidden' value='' />
+                    <input id="runOption-value" type='hidden' value='run' />
+                  
+                    <div id="modules" class="hide" data-interface="overlay">
+                        <a class="menu-button closer" data-action="code.modules" data-data="close"><i class="fa fa-times-circle-o"></i></a>
+                    </div>
+                  
+                    <div id="editor" class="code-editor hide" data-interface="editor"></div>
+
+                    <div id="dragbar"></div>
+
+                    <div id="codeOutput" class="codeOutput hide" data-interface="output">
+
+                        <!-- when hiding instructions: hideInstructions -->
+                        <div id="outputTabs" class="">
+                            <div class="active menu-button" id="codeOutputTab" data-action="output.view">Result</div>
+                            <div class="menu-button" id="instructionsTab" data-action="instructions.view"><i class="fa fa-list"></i> Instructions</div>
+                        </div>
+                        
+                        <!-- when hiding instructions: withoutTabs -->
+                        <div id="outputContainer" class="withTabs">
+                            <div id="graphic-wrap" class="hide">
+                                <div id="graphic" aria-label="Visual Output" role="application" tabindex="0"></div>
+                            </div>
+
+                            <div id="output-dragbar" class="hide" data-action="resize"></div>
+
+                            <div id="console-wrap" class="hide">
+                                <div id="console-output" aria-live="assertive" aria-label="Code Output"></div>
+                                <a id="reset-output" title="clear output"><i class="fa fa-ban"></i></a>
+                            </div>
+
+                            <div id="unittest-wrap" class="hide">
+                                <div id="unittest-output">
+                                    <div class="row grey collapse">
+                                        <div class="small-12 column">
+                                            <p class="text-center overview" id="test-totals"></p>
+                                        </div>
+                                    </div>
+                                    <ul class="accordion" id="unittest-accordion" data-accordion>
+                                    </ul>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div id="instructionsContainer" class="hide">
+                            <div id="instructionsActions" class="">
+                                <a id="edit-instructions-link"><i class="fa fa-pencil hide" title="Edit"></i></a>
+                            </div>
+                            <div id="instructionsToolbar" class="hide">
+                                <a class="right" id="save-instructions"><i class="fa fa-save" title="Save"></i></a>
+                                <a id="cancel-edit-instructions"><i class="fa fa-times" title="Cancel"></i></a>
+                            </div>
+
+                            <div id="instructionsOutput"></div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </section>
+
+        </div>
+    </div>
+  
+    <script id="statusMessageTemplate" type="text/html">
+        <div id="statusMessages" aria-live="assertive" role="alert" tabindex=0 data-inteface="alert" data-alert class="alert-box {{type}}">
+            <div>{{message}}</div>
+            <a href="b7b06252f4.html#" title="Close message" class="close" aria-label="Close Alert" role="button"><i class="fa fa-times-circle"></i></a>
+        </div>
+    </script>
+    <div id="content-overlay" class="hide"></div>
+
+    <!-- the response-indicator divs allow javascript to determine which responsive size is being applied -->
+    <div class="responsive-indicator show-for-small-only" data-size="small"></div>
+    <div class="responsive-indicator show-for-medium-only" data-size="medium"></div>
+    <div class="responsive-indicator show-for-large-up" data-size="large"></div>
+
+    <div id="confirmResetModal" class="reveal-modal medium" data-reveal data-css-top="35">
+        <div class="row">
+            <h2 id="modalTitle">Are you sure?</h2>
+            <p class="lead">Resetting will undo all of your current changes.</p>
+            <a class="button caution menu-button allow-original" data-action="code.cancel-reset">Cancel</a>
+            <a class="button danger menu-button allow-original" data-action="code.confirm-reset">Yes, I am sure.</a>
+            <a class="close-reveal-modal" aria-label="Close">&#215;</a>
+        </div>
+    </div>
+
+    <div id="badBrowser" class="reveal-modal medium" data-reveal data-css-top="35">
+        <div class="row">
+            <h2 id="modalTitle">Stop!</h2>
+            <p class="lead">Internet Explorer is not supported. Try Firefox, Chrome, or Edge. </p>
+            <a class="close-reveal-modal" aria-label="Close">&#215;</a>
+        </div>
+    </div>
+
+    <ul id="run-options" class="f-dropdown" data-dropdown-content>
+        <li><a class="menu-button" data-action="code.run" data-button="run"><i class="fa fa-play"></i>Run</a></li>
+        <li><a class="menu-button" data-action="code.console" data-button="console"><i class="fa fa-terminal"></i>Console</a></li>
+        <li><a class="menu-button" data-action="code.debug"><i class="fa fa-bug"></i>Debug</a></li>
+    </ul>
+
+    <script id="unittest-error" type="text/template">
+        <li class="accordion-navigation">
+            <a href="b7b06252f4.html#panel-{{testNumber}}">
+                <div class="really-wrong">
+                    <div class="col-md-10">
+                        <p><i class="fa fa-angle-right fa-lg open-close-indicator"></i>{{shortDescription}}</p>
+                    </div>
+                    <div class="col-md-2">
+                        <p class="text-center"><i class="fa fa-circle-o fa-lg"></i></p>
+                    </div>
+                </div>
+            </a>
+            <div id="panel-{{testNumber}}" class="content">
+                <p>
+                    <strong>Message:</strong> <pre>{{reason}}</pre>
+                </p>
+            </div>
+        </li>
+    </script>
+
+    <script id="unittest-fail" type="text/template">
+        <li class="accordion-navigation">
+            <a href="b7b06252f4.html#panel-{{testNumber}}">
+                <div class="really-wrong">
+                    <div class="col-md-2">
+                        <p><i class="fa fa-circle-o fa-lg"></i></p>
+                    </div>
+                    <div class="col-md-9 column">
+                        <p>{{shortDescription}}</p>
+                    </div>
+                </div>
+            </a>
+            <div id="panel-{{testNumber}}" class="content">
+                <p>
+                    {{description}} 
+                    {{reason}}
+                </p>
+            </div>
+        </li>
+    </script>
+
+    <script id="unittest-pass" type="text/template">
+        <li class="accordion-navigation">
+            <div class="really-right">
+              <div class="md-2">
+                <p><i class="fa fa-check-circle fa-lg"></i></p>
+              </div>
+              <div class="md-10 column">
+                <p>{{shortDescription}}</p>
+              </div>
+            </div>
+        </li>
+    </script>
+
+    <script id="draftTextTemplate" type="text/html">
+        <a class="menu-button" data-action="code.reset" title="Reset"><i class="fa fa-refresh"></i></a> {{draftText}}
+    </script>
+
+    <script id="addInstructionsTemplate" type="text/html">
+        <p>Click the pencil icon to add instructions to your gadget. When anyone else views this gadget, they'll also be able to view them.</p>
+    </script>
+
+    <script id="editInstructionsTemplate" type="text/html">
+        <div id="embedded-instructions"></div>
+    </script>
+
+    <!--[if IE]>
+    <script src="/cache-prefix-1528245195812dist/jszip-utils-ie.min.js" type="text/javascript"></script>
+    <![endif]-->
+  
+    <script src='libs/file-saver.js/1.20150507.2/FileSaver.js'></script>
+    <script src='libs/lodash/2.4.1/dist/lodash.min.js'></script>
+    <script src='libs/bluebird/3.5.1/js/browser/bluebird.min.js'></script>
+    <script src="libs/moment.js/2.18.1/moment.min.js" type="text/javascript"></script>
+    <script src='libs/ace-builds/v1.2.6.1rc2/src-min-noconflict/ace.js'></script>
+    <script src='libs/ace-builds/v1.2.6.1rc2/src-min-noconflict/ext-modelist.js'></script>
+    <script src='libs/ace-builds/v1.2.6.1rc2/src-min-noconflict/ext-language_tools.js'></script>
+    <script type="text/javascript" src="libs/skulpt/skulpt.min.js"></script>
+    <script type="text/javascript" src="libs/skulpt/skulpt-stdlib.js"></script>
+    <script src="libs/marked/lib/marked.js"></script>
+    <script src="libs/traqball.js/src/traqball.js"></script>
+    <script src="libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+    <script src="libs/highlight.js/8.0/highlight.min.js"></script>
+    <script src="js/gadget-config.js"></script>
+    <script src="js/gadget-markdown.js"></script>
+    <script src="js/embed-python.js" type="text/javascript"></script>  
+    <script src="js/editor.js" type="text/javascript"></script>
+</body>
+</html>
