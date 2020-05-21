@@ -1,5 +1,4 @@
-var $builtinmodule = function (name) {
+var $builtinmodule = function(name) {
     var gadget = {};
-
     return gadget;
 };
