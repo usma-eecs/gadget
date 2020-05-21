@@ -18,10 +18,10 @@ Gadgets are saved as `div`s with a `pre` for each file in the gadget. Since gadg
 
 ```html
 <div class="gadget">
+    <pre id="instructions.md">Fix the error in `main.py`</pre>
     <pre id="main.py">print(hello world)</pre>
     <pre id="tests.py" class="hidden">import gadget.tests as tests
 tests.assertNoErrors()
 tests.run()</pre>
-    <pre id="instructions.md">Fix the error `main.py`</pre>
 </div>
 ```
