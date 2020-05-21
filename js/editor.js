@@ -92,9 +92,9 @@ $(document).ready(function() {
           // reveal the reset button
           $('.reset-it').removeClass('hide');
         }
-      
+
         // hide instructions tab if there aren't any
-        if (config.description == '') {
+        if (config.description == '' && !(admin  && !config.settings.readonly)) {
           $('#codeOutputTab').css('width', '100%');
         } else { 
           GadgetApp.showInstructions();
