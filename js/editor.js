@@ -76,7 +76,7 @@ $(document).ready(function() {
           // the only time a gadget is read-only is when an admin 
           // is editing a quiz (but not this gadget). So they can 
           // see the hidden files even depite being in guest context 
-          if (config.settings.readonly == false) {
+          if (config.settings.readonly != true) {
             $('.hidden-file-indicator').closest('.tab').hide();
           }
 
