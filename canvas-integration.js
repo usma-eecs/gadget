@@ -5,7 +5,7 @@ if (match && !document.location.search.match('badgadget')) {
   window.CONTEXT = {}
   var course = match[1];  
 
-  // capture the context that impact how we render gadgets
+  // capture the contexts that impact how we render gadgets
   if (ENV.QUIZ) {
     if (ENV.IS_PREVIEW || ENV.QUIZ.locked_for_user == false) {
       if (location.pathname.endsWith('/take')) {
@@ -16,6 +16,8 @@ if (match && !document.location.search.match('badgadget')) {
     }
   } else if (location.pathname.match(/^\/courses\/(\d+)\/question_banks\/(\d+)/)) {
     CONTEXT.EDITING_QUIZ = true;
+  } else if (ENV.WIKI_PAGE && ENV.WIKI_PAGE.url == "my-gadget") {
+    CONTEXT.MY_GADGET = true;
   }
 
   console.log("master: ", CONTEXT);
@@ -79,19 +81,22 @@ if (match && !document.location.search.match('badgadget')) {
   }
 
   // converts a <div class='gadget'>...</div> to an iframe
-  var render = function(div, readonly, role, callback) {
-    if ($('iframe.gadget',div).length > 0) {
+  var render = function(div, settings, callback) {
+    if ($('iframe.gadget', div).length > 0) {
       console.log("master: gadgetfy called twice on", div);
     } else { 
       var files = [];
+      
+      var defaults = {
+        role: 'guest',
+        readonly: false, 
+        activeTab: 'main.py',
+        send_updates: callback ? 'on_change' : false
+      }
 
       var config = {
-        settings: {
-          role: role,
-          readonly: readonly, 
-          activeTab: 'main.py'
-        },
-        description: ''
+        description: '',
+        settings: $.extend(defaults, settings)
       };
 
       $('pre', div).each(function() {
@@ -128,8 +133,7 @@ if (match && !document.location.search.match('badgadget')) {
       
       var message = { 
         type: 'init', 
-        data: data,
-        send_updates: !!callback
+        data: data
       };
 
       // pass the new iframe its gadget code
@@ -159,7 +163,7 @@ if (match && !document.location.search.match('badgadget')) {
       var gadgets = $('div.gadget', doc).not(":has(iframe.gadget)");
       
       gadgets.each(function() {
-        render(this, false, "owner", update => { 
+        render(this, { role: "owner" }, update => { 
           unpackUpdate(update, this);
         });
       });
@@ -205,7 +209,6 @@ if (match && !document.location.search.match('badgadget')) {
     // remove the rendered gadget iframe when saving
     editor.on('PreProcess', e => {
       $('div.gadget > iframe', e.node).remove();
-      $('div.gadget > #instructions\\.md', e.node).show();
     });
   }
 
@@ -235,24 +238,55 @@ if (match && !document.location.search.match('badgadget')) {
         var question_input = question.find('.question_input').get(0);
         var div = $('<div class="gadget">').get(0);
         
-        // find the editor for this question
-        render(this, false, 'guest', update => {
+        render(this, {}, update => {
           unpackUpdate(update, div);
           tinymce.get(question_input.id).setContent(div.outerHTML);
         });
       });
-    } else {
+    } 
+    
+    // inject the user's personal gadget editor
+    else if (CONTEXT.MY_GADGET) {
+      var id = ENV.current_user.id;
+      var div = $("<div class='gadget'></div>")
+        .append("<pre id='main.py'></pre>")
+        .append("<pre id='instructions.md'>This is your personal gadget editor. Any changes you make will be saved.</pre>");
+
+      $.get('/api/v1/users/' + id + '/files?search_term=my_gadget.html', files => {
+        console.log(files);
+        var file = files.find(file => file['full_name'] == 'my_gadget.html');
+
+        if (file) {
+          console.log("master: personal gadget found");
+        } 
+        
+        // create a new gadget
+        else {
+          console.log("master: user doesn't have a personal gadget");
+          $('.user_content').append(div);
+
+          render(div, { role: 'owner', send_updates: 'on_save' }, gadget => {
+            console.log('master: personal gadget save requested');
+            // $.get('/api/v1/users/' + id + '/files?search_term=my_gadget.html', 
+            // success => console.log('master: personal gadget saved'), 
+            // failure => console.log('master: personal gadget saved'))
+          });
+        }
+      });
+    } 
+    
+    // all other contexts
+    else {
       $('div.gadget').not(":has(iframe.gadget)").each(function() { 
-        render(this, CONTEXT.EDITING_QUIZ, 'guest');
+        render(this, { readonly: CONTEXT.EDITING_QUIZ });
       });
 
       // the quiz editor injects gadgets in such a way that we can't
       // detect them through events
       if (CONTEXT.EDITING_QUIZ) {
-        console.log("checking for gadgets");
         setInterval(() => {
           $('div.gadget').not(":has(iframe.gadget)").each(function() { 
-            render(this, CONTEXT.EDITING_QUIZ, 'guest');
+            render(this, { readonly: CONTEXT.EDITING_QUIZ });
           });
         }, 1000);
       }

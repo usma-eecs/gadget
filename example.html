@@ -98,7 +98,6 @@
             $('pre', div).hide();
             
             var gadget = $('<iframe>', {
-              height: 350,
               width: '100%',
               frameborder: 0,
               marginwidth: 0,
@@ -122,10 +121,19 @@
             send(gadget.get(0), message, callback);
           }
         }
-        console.log("got here");
         $('div.gadget').each(function() { render(this, false, "owner") });
       });
     </script>
+    <style>
+      html, body, iframe {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        display: block;
+      }
+    </style>
   </head>
 
 <div class="gadget">

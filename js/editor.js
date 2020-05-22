@@ -45,9 +45,6 @@ $(document).ready(function() {
       $('#badBrowser').foundation("reveal", "open");
   }
 
-  $('#edit-instructions-link').click(() => taint = true);
-  $('#save-instructions').click(() => taint = true);
-
   // receive editor updates
   var messages = {};
 
@@ -102,26 +99,77 @@ $(document).ready(function() {
 
         if (fileFor("tests.py")) {
           GadgetApp.toggleCheckButton();
-          // $('#editor').trigger("gadget.code.check");
+
+          if (config.description == '') {
+            $('#editor').trigger("gadget.code.check");
+          }
         }
         
         if (config.settings.activeTab) {
           GadgetApp.getEditor().selectFile(config.settings.activeTab);
         }
 
-        if (message.send_updates) {
-          var tainted = false;
-          GadgetApp.onChange(() => tainted = true);
+        // send updates on change
+        if (config.settings.send_updates) {
+          if (config.settings.send_updates == 'on_change') {
+            var changed = false;
+            
+            $('#save-instructions').click(() => changed = true);
+            $(document).on("gadget.resetted", () => changed = true);
+            $(document).on("gadget.code.change", () => changed = true);
+            
+            setInterval(() => {
+              if (changed) { 
+                changed = false;
+                var data = GadgetApp.getAsDataURL();
+                var update = {id: message.id, type: 'update', data: data};
+                
+                console.log("gadget: change detected, sending update ...");
+                original.source.postMessage(update, original.origin);
+              }
+            }, 1000);
+          } 
 
-          setInterval(() => {
-            if (tainted) { 
-              console.log("gadget: gadget changing, sending update ...");
-              tainted = false;
+          else if (config.settings.send_updates == 'on_save') {
+            $('.save-it').removeClass('hide');
+
+            // add save keyboard shortcut
+            GadgetApp.getEditor().addCommand("save", {
+              win: "Ctrl-s",
+              mac: "Command-s"
+            }, () => $('.save-it').click());
+
+            var changed = function() { 
+              $('.save-it > label').text("Save");
+              $('.save-it').removeClass('disabled');
+            };
+
+            $('#save-instructions').click(changed);
+            $(document).on("gadget.resetted", changed);
+            $(document).on("gadget.code.change", changed);
+            
+            $('.save-it').click(() => {
+              $('.save-it')
+                .addClass('disabled blue-highlight')
+                .css('background-color', '')
+                .children('label').text("Saving...")
+              
+              var tab = GadgetApp.getEditor().activeTab().fileName;
+              GadgetApp._gadget.settings.activeTab = tab;
+              
               var data = GadgetApp.getAsDataURL();
               var update = {id: message.id, type: 'update', data: data};
+              
+              console.log("gadget: save requested, sending update ...");
               original.source.postMessage(update, original.origin);
-            }
-          }, 1000);
+              
+              $('.save-it > label').text("Saved");
+            });
+          }
+
+          else {
+            console.log("gadget: unknown value for config.settings.send_updates: ", config.settings.send_updates);
+          }
         }
       }
     }
