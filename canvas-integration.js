@@ -155,10 +155,10 @@ if (match && !document.location.search.match('badgadget')) {
     });
   }
 
-  var hookTinyMCE = editor => {
+  var editorHook = editor => {
     console.log('master: hooking editor ' + editor.id);
   
-    var renderGadgets = event => {
+    var renderInsideEditor = event => {
       var doc = editor.getDoc();
       var gadgets = $('div.gadget', doc).not(":has(iframe.gadget)");
       
@@ -184,7 +184,7 @@ if (match && !document.location.search.match('badgadget')) {
   
       button.click(() => {
         defaultGadget(gadget => editor.insertContent(gadget));
-        setTimeout(renderGadgets, 500);
+        setTimeout(renderInsideEditor, 500);
       });
 
       var container = $(editor.getElement()).siblings('.mce-container');
@@ -195,16 +195,16 @@ if (match && !document.location.search.match('badgadget')) {
   
     if (editor.initialized) {
       addButton()
-      renderGadgets()
+      renderInsideEditor()
     }
   
     editor.on('init', () => { 
       addButton();
-      renderGadgets(); 
+      renderInsideEditor(); 
     });
   
     // render gadgets after loading content
-    editor.on('LoadContent', renderGadgets);
+    editor.on('LoadContent', renderInsideEditor);
   
     // remove the rendered gadget iframe when saving
     editor.on('PreProcess', e => {
@@ -212,17 +212,16 @@ if (match && !document.location.search.match('badgadget')) {
     });
   }
 
-  // we are taking or previewing a quiz
-  if (ENV.QUIZ && (ENV.IS_PREVIEW || ENV.QUIZ.locked_for_user == false)) {
-    console.log("master: ignoring gadgets in tinymce editors");
+  if (CONTEXT.TAKING_QUIZ) {
+    console.log("master: ignoring gadgets in editors");
   } else {
-    var watchForTinyMCE = setInterval(function() {
+    var waitForEditor = setInterval(function() {
       if (typeof tinymce !== 'undefined') {
-        clearInterval(watchForTinyMCE);
-        tinymce.get().forEach(hookTinyMCE);
+        clearInterval(waitForEditor);
+        tinymce.get().forEach(editorHook);
   
         tinymce.on('AddEditor', instance => { 
-          hookTinyMCE(instance.editor) 
+          editorHook(instance.editor) 
         });
       }
     }, 100);
@@ -232,15 +231,25 @@ if (match && !document.location.search.match('badgadget')) {
   $(function() {
     if (CONTEXT.TAKING_QUIZ) {
       $('div.gadget').each(function() {
+        var questionDiv = this;
+        var answerDiv = $('<div class="gadget">').get(0);
+
         var question = $(this).closest('.question');
+        var question_input = question.find('.question_input');
+        
         $('.answers', question).hide();
 
-        var question_input = question.find('.question_input').get(0);
-        var div = $('<div class="gadget">').get(0);
+        // load a previous answer if there is one
+        if (question_input.val()) {
+          $(this).html(question_input.val());
+          questionDiv = $(this).children().get(0);
+        }
         
-        render(this, {}, update => {
-          unpackUpdate(update, div);
-          tinymce.get(question_input.id).setContent(div.outerHTML);
+        render(questionDiv, {}, update => {
+          unpackUpdate(update, answerDiv);
+          var editor = tinymce.get(question_input.attr('id'));
+          editor.setContent(answerDiv.outerHTML);
+          tinymce.triggerSave()
         });
       });
     } 
