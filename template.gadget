@@ -1,0 +1,7 @@
+<div class="gadget">
+    <pre id="instructions.md">Fix the error in `main.py`</pre>
+    <pre id="main.py">print(hello world)</pre>
+    <pre id="tests.py" class="hidden">import gadget.tests as tests
+tests.assertNoErrors()
+tests.run()</pre>
+</div>
