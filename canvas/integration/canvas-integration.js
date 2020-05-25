@@ -186,8 +186,7 @@ $(() => {
           console.log('master: hooking editor ' + editor.id);
 
           var editorRender = event => {
-            var doc = editor.getDoc();
-            $('div.gadget', doc).each((i, gadget) => {
+            $('div.gadget', editor.getDoc()).each((i, gadget) => {
               // if we're editing a quiz question, select the gadget question option
               var question = $(editor.getElement()).closest('.question');
               $(question).find('.gadget_question').attr('selected', true);              
@@ -200,7 +199,7 @@ $(() => {
           }
       
           var insertGadget = () => {
-            console.log("click");
+            console.log("insert");
             templateGadget(gadget => editor.rceWrapper.insert_code(gadget));
             setTimeout(editorRender, 500);
           };
@@ -232,8 +231,13 @@ $(() => {
             question.find(".question_type:not(:has('.gadget_question'))").append(
               $("<option value='essay_question'>Gadget Question</option>")
                 .addClass('gadget_question')
-                .click(insertGadget)
             );
+
+            question.find(".question_type").change(()=> {
+              if ($(editor.getDoc()).find('div.gadget').length == 0) {
+                insertGadget();
+              }
+            });
           }
 
           editor.on('init', (e) => {
