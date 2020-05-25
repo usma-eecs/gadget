@@ -135,7 +135,7 @@ $(() => {
         
         if (admin != true) {
           // the only time a gadget is read-only is when an admin
-          // is editing a quiz, so they can see hidden files depite 
+          // is editing a quiz, so they can see hidden files despite 
           // not being in an owner context 
           if (readonly != true) {
             $('.hidden-file-indicator').closest('.tab').hide();
@@ -148,7 +148,7 @@ $(() => {
 
         if (readonly) {
           $('#instructionsActions').hide();
-          $('.ace_text-input').attr('readonly', true)
+          $('.ace_text-input').attr('disabled', true)
         } else {
           // reveal the reset button
           $('.reset-it').removeClass('hide');

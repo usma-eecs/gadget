@@ -77,16 +77,19 @@ $(() => {
 
   // we only render gadgets within the context of a course
   var match = document.location.pathname.match(/^\/courses\/(\d+)/);
-
+  
   if (match && !document.location.search.match('badgadget')) {
-    $('div.gadget').each((i, gadget) => {
-      var answer = $('<div class="gadget">');
-      var question = $(gadget).closest('.question'); 
-      var question_input = question.find('.question_input');
+    var roles = ENV.current_user_roles;
+    var admin = roles.includes("teacher") || roles.includes("admin");
 
-      if (question_input.length) {
+    $('div.gadget').each((i, gadget) => {
+      if (ENV.QUIZ && location.pathname.endsWith('/take')) {
         console.log("master: taking a quiz");
+
         $('.answers', question).hide();
+        var answer = $('<div class="gadget">');
+        var question = $(gadget).closest('.question'); 
+        var question_input = question.find('.question_input');
 
         // load a previous answer if there is one
         if (question_input.val()) {
@@ -94,7 +97,7 @@ $(() => {
           gadget = $(gadget).children().get(0);
         }
 
-        render(gadget, { 
+        render(gadget, {           
           onEdit: update => {
             answer.html(update);
             var editor = tinymce.get(question_input.attr('id'));
@@ -103,14 +106,17 @@ $(() => {
           }
         });   
       }
-      
-      else if (question.length) {
-        console.log("master: editing a quiz", question);
+
+      else if (ENV.QUIZ && admin && location.pathname.endsWith('/edit')) {
+        console.log("master: editing a quiz");
+
         // you have to click the pencil to edit
         render(gadget, { readonly: true });
-      }  
-      
+      }
+
       else if ($(gadget).hasClass('personal')) {
+        console.log("master: personal gadget", id);
+
         var id = gadget.id; 
         var user_id = ENV.current_user.id;
 
@@ -118,8 +124,6 @@ $(() => {
           console.log("master: can't render a personal gadget without an id!");
           render(gadget);
         } else {
-          console.log("master: personal gadget", id);
-          
           var config = { 
             admin: true, 
             onSave: html => {
@@ -167,12 +171,12 @@ $(() => {
                 });
               })
             } else {
-              console.log("master: user doesn't have a personal gadget");
               render(gadget, config);
             }
           });
         }
       } else {
+        console.log("master: default gadget");
         render(gadget);
       }
     });
@@ -267,10 +271,9 @@ $(() => {
             $('div.gadget', e.node).each((i, gadget) => {
               var html = $('iframe.gadget', gadget).attr('data-gadget');
 
-              if (html) {
+              // some gadgets aren't rendered, like those in quiz answer fields
+              if (html) { 
                 gadget.innerHTML = html;
-              } else {
-                console.log("master: warning - found unrendered gadget", gadget);
               }
             });
           });
