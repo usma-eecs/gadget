@@ -199,7 +199,6 @@ $(() => {
           }
       
           var insertGadget = () => {
-            console.log("insert");
             templateGadget(gadget => editor.rceWrapper.insert_code(gadget));
             setTimeout(editorRender, 500);
           };
