@@ -121,7 +121,7 @@ $(() => {
           console.log("master: personal gadget", id);
           
           var config = { 
-            role: 'owner', 
+            admin: true, 
             onSave: html => {
               console.log('master: personal gadget save requested');
               

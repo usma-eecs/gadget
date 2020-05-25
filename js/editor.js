@@ -107,7 +107,7 @@ $(() => {
   
         gadget.children('pre').each((i,pre) => {
           if (pre.id == 'instructions.md') {
-            config.description = this.textContent;
+            config.description = pre.textContent;
           } else {
             config.code.push({
               name: pre.id,
@@ -124,7 +124,10 @@ $(() => {
         });
   
         config.code = JSON.stringify(config.code);
-        GadgetApp.initialize(config);
+
+        GadgetApp._gadget = config;
+        GadgetApp._original = config;
+        GadgetApp.reset(config);
 
         if (activeTab) {
           GadgetApp.getEditor().selectFile(activeTab)
