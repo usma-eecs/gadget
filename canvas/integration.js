@@ -135,7 +135,8 @@ $(() => {
               var params = { 
                 name: `${id}.gadget`, 
                 content_type: 'text/plain',
-                on_duplicate: 'overwrite'
+                on_duplicate: 'overwrite',
+                parent_folder_path: 'my files/gadgets'
               }
 
               $.post(path, params).done(data => {
