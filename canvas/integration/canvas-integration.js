@@ -86,10 +86,11 @@ $(() => {
       if (ENV.QUIZ && location.pathname.endsWith('/take')) {
         console.log("master: taking a quiz");
 
-        $('.answers', question).hide();
         var answer = $('<div class="gadget">');
         var question = $(gadget).closest('.question'); 
         var question_input = question.find('.question_input');
+
+        $('.answers', question).hide();
 
         // load a previous answer if there is one
         if (question_input.val()) {
