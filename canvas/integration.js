@@ -115,11 +115,10 @@ $(() => {
         render(gadget, { readonly: true });
       }
 
-      else if ($(gadget).hasClass('personal')) {
-        console.log("master: personal gadget", id);
-
+      else if ($(gadget).hasClass('personal')) {  
         var id = gadget.id; 
         var user_id = ENV.current_user.id;
+        console.log("master: personal gadget", id);
 
         if (!id) {
           console.log("master: can't render a personal gadget without an id!");
@@ -245,6 +244,13 @@ $(() => {
             });
           }
 
+          // in case we've already missed the initialization hook
+          if (editor.initialized) {
+            addButton();
+            addGadgetQuestionType();
+            editorRender();
+          }
+          
           editor.on('init', (e) => {
             addButton();
             addGadgetQuestionType();
