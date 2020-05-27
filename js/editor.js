@@ -41,7 +41,7 @@ $(() => {
           pre.addClass("hidden");
         }
 
-        if (file.name == active) {
+        if (!file.hidden && file.name == active) {
           pre.addClass("active");
         }
         

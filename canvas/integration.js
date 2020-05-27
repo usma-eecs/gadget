@@ -83,6 +83,10 @@ $(() => {
     var admin = roles.includes("teacher") || roles.includes("admin");
 
     $('div.gadget').each((i, gadget) => {
+      if (ENV.QUIZ && !admin) {
+        $("pre[id*='answer' i]").filter('.hidden').remove();
+      }
+
       if (ENV.QUIZ && location.pathname.endsWith('/take')) {
         console.log("master: taking a quiz");
 
@@ -98,7 +102,7 @@ $(() => {
           gadget = $(gadget).children().get(0);
         }
 
-        render(gadget, {           
+        render(gadget, {
           onEdit: update => {
             answer.html(update);
             var editor = tinymce.get(question_input.attr('id'));
