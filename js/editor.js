@@ -35,7 +35,7 @@ $(() => {
       this.getEditor()._files.forEach(file => {
         var pre = $('<pre/>')
           .attr('id', file.name)
-          .html(file.editor.getValue());
+          .text(file.editor.getValue());
 
         if (file.hidden) {
           pre.addClass("hidden");
