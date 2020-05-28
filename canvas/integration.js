@@ -194,12 +194,8 @@ $(() => {
         function hook(editor) {
           console.log('master: hooking editor ' + editor.id);
 
-          var editorRender = event => {
-            $('div.gadget', editor.getDoc()).each((i, gadget) => {
-              // if we're editing a quiz question, select the gadget question option
-              var question = $(editor.getElement()).closest('.question');
-              $(question).find('.gadget_question').attr('selected', true);              
-
+          var editorRender = () => {
+            $('div.gadget', editor.getDoc()).each((i, gadget) => {          
               render(gadget, {
                 admin: true, 
                 onEdit: html => $('iframe.gadget', gadget).attr('data-gadget', html)
@@ -234,18 +230,21 @@ $(() => {
           }
 
           var addGadgetQuestionType = () => {            
-            // add a gadget question type
+            // add a gadget question type            
             var question = $(editor.getElement()).closest('.question');
-            question.find(".question_type:not(:has('.gadget_question'))").append(
-              $("<option value='essay_question'>Gadget Question</option>")
-                .addClass('gadget_question')
-            );
+            var hasGadgets = () => $(editor.getDoc()).find('div.gadget').length > 0;
 
-            question.find(".question_type").change(()=> {
-              if ($(editor.getDoc()).find('div.gadget').length == 0) {
-                insertGadget();
+            var option = $("<option value='essay_question'>Gadget Question</option>")
+              .addClass('gadget_question')
+              .attr('selected', hasGadgets());
+
+            question.find(".question_type").not(':has(.gadget_question)')
+              .append(option).change(() => {
+                if (option.attr('selected') && hasGadgets() == false) {
+                  insertGadget();
+                }
               }
-            });
+            );
           }
 
           // in case we've already missed the initialization hook
@@ -254,7 +253,7 @@ $(() => {
             addGadgetQuestionType();
             editorRender();
           }
-          
+
           editor.on('init', (e) => {
             addButton();
             addGadgetQuestionType();
@@ -272,7 +271,7 @@ $(() => {
             // when you save a quiz question, the gadget is inserted 
             // outside the editor, so go find the un-rendered gadget
             setTimeout(() => {
-              $("div.gadget:not(:has('iframe.gadget'))").each(
+              $("div.gadget").not(":has('iframe.gadget')").each(
                 (i,unRenderedGadget) => render(unRenderedGadget)
               )
             }, 500);
