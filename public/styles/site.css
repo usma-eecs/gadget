@@ -1,0 +1,60 @@
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  /* Margin bottom by footer height */
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+.footer {
+  text-align: center;
+  position: absolute;
+  font-size: 8pt;
+  bottom: 0;
+  width: 100%;
+  /* Set the fixed height of the footer here */
+  height: 60px;
+  line-height: 60px; /* Vertically center the text there */
+}
+
+/* chat */
+
+#users {
+  height: 60vh;
+  overflow-x: auto;
+  overflow-y: scroll;
+  overflow-wrap: break-word;
+  border: 1px solid lightgray;
+}
+
+#messages {
+  height: 60vh;
+  overflow-x: auto;
+  overflow-y: scroll;
+  overflow-wrap: break-word;
+  padding-left: 5px;
+  border: 1px solid lightgray;
+}
+
+.user {
+  color: white;
+}
+
+.message {
+  display: inline-block;
+}
+
+.text {
+  margin-left: 5px;
+}
+
+.input {
+  padding: 0;
+}
+
+.input input {
+  width: 100%;
+}

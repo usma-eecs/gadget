@@ -1,0 +1,13 @@
+.col-4.offset-4
+  
+  center
+    - if rooms.empty?
+      h2 No active rooms
+    - else
+      h2 Join a Chat
+
+  ul 
+    h3
+      - rooms.each do |room|
+        li
+          a href="/#{room}" =room.tr('.',' ')

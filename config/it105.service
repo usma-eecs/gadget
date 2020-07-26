@@ -1,0 +1,17 @@
+# /etc/systemd/system/it105.service
+
+[Unit]
+Description=IT105 Server
+Wants=nginx.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/it105/
+Environment=RACK_ENV=production
+ExecStartPre=/root/.rbenv/shims/bundle 
+ExecStart=/root/.rbenv/shims/bundle exec "puma -b tcp://0.0.0.0:9292 config.ru"
+ExecStop=/bin/kill -- $MAINPID
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
