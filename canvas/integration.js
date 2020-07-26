@@ -294,5 +294,12 @@ $(() => {
         tinymce.on('AddEditor', instance => hook(instance.editor));
       }
     }, 100);
+
+    // render a quiz submission stream
+    $("#ic-QuizInspector button:contains('View HTML')").click(function() {
+      console.log(this);
+      var answer = $(this).closest('#ic-QuestionInspector__Answer');
+      $('div.gadget', answer).each((j,gadget) => render(gadget));
+    });    
   }
 });
