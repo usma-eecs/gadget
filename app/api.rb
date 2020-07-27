@@ -54,29 +54,43 @@ class API
     self.request :put, *args
   end
 
-  # 
-  def self.get_courses_for email
-    # get all courses this API token can access and filter out any that 
-    # aren't configured for gadgets
-    gadget_courses = API.get('/api/v1/courses').filter_map do |course|
+  # returns a hash of enrollments for the user
+  def self.userinfo email
+    id = nil
+
+    # create a mapping of courses with gadgets enabled to dates that those 
+    # courses end since we don't allow editing after course end
+    gadget_courses = API.get('/api/v1/courses').each_with_object({}) do |course, hash|
       tools = API.get "/api/v1/courses/#{course['id']}/external_tools"
-      course['id'] if tools.any? {|tool| tool['consumer_key'] == ENV['LTI_KEY']}
+      
+      if tools.any? {|tool| tool['consumer_key'] == ENV['LTI_KEY']}
+        hash[course['id'].to_s] = course['end_at']
+      end
     end
     
     # find which gadget courses this user is registered in and return
     # a mapping from course ids to booleans indicating if they have
     # elevated privileges in that course (teacher or course designer)
-    gadget_courses.each_with_object(Hash.new) do |course_id, hash|
-      users = API.get("/api/v1/courses/#{course_id}/search_users", params: { 
+    courses = gadget_courses.each_with_object({}) do |(cid,ends), hash|
+      users = API.get("/api/v1/courses/#{cid}/search_users", params: { 
         search_term: email,
         'include[]' => 'enrollments'
       })
         
       if user = users.find {|info| info['email'] == email}
-        hash[course_id] = user['enrollments'].any? do |enrollment|
+        id ||= user['id'].to_s
+
+        teacher = user['enrollments'].any? do |enrollment|
           ['DesignerEnrollment', 'TeacherEnrollment'].include? enrollment['type']
         end
+
+        hash[cid] = {
+          'ends' => ends,
+          'role' => teacher ? 'teacher' : 'student',
+        }
       end
     end
+
+    { 'id' => id, 'email' => email, 'courses' => courses }
   end
 end

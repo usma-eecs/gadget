@@ -6,6 +6,7 @@ require 'concurrent'
 class LTI < Roda
   plugin :halt
   plugin :middleware
+  plugin :render, engine: 'slim'
 
   # track oauth nonce to prevent replay attacks
   nonces = Concurrent::Map.new
@@ -17,8 +18,7 @@ class LTI < Roda
   end.execute
 
   route do |r|
-    # user is authenticating using an LTI launch request
-    r.on 'lti', method: 'post' do      
+    r.on 'lti', method: 'post' do
       unless r.POST['lti_message_type'] == 'basic-lti-launch-request'
         r.halt 400, 'Bad lti_message_type.' 
       end
@@ -30,7 +30,7 @@ class LTI < Roda
       )
 
       unless launch_auth.valid_signature?
-        r.halt 401, "Invalid LTI credentials"
+        r.halt 401, "Invalid LTI signature"
       end
 
       if Time.now.getutc.to_i - r.POST['oauth_timestamp'].to_i > 1.minute
@@ -43,12 +43,42 @@ class LTI < Roda
         nonces.put_if_absent r.POST['oauth_nonce'], Time.now
       end
 
-      unless r.POST['roles'] and r.POST['custom_canvas_user_id']
-        r.halt 401, "LTI message is missing a custom_canvas_user_id or roles" 
+      id = r.POST['custom_canvas_user_id']
+      email = r.POST['lis_person_contact_email_primary']
+
+      # their primary email address *must* be a westpoint.edu or we 
+      # can't correlate between O365 logins and LTI logins      
+      if email.nil? or not email.ends_with? '@westpoint.edu'
+        session.clear
+
+        r.halt 401, render(:card, locals: {
+          title: '¯\_(ツ)_/¯', 
+          text: "Your primary email address in Canvas must be a <b>westpoint.edu</b> address to create gadgets. To fix this, head to <a href='https://canvas.instructure.com/profile/settings'/>https://canvas.instructure.com/profile/settings</a> and update your primary email address."
+        })
       end
 
-      # this hackery tell Roda to call the next app in 
-      # the middleware stack, which is either gadget or chat 
+      # we don't want to re-authenticate the user every time they 
+      # create a gadget, but we should make sure ids and emails match      
+      if session['email'] and email != session['email']
+        r.halt 401, render(:card, locals: {
+          title: '¯\_(ツ)_/¯', 
+          text: "<b>#{email}</b> is logged into Canvas, but <b>#{session['email']}</b> is currently logged into the gadget server.<br><br>You can fix this by <a href='/logout'>logging out of the gadget server</a>."
+        }) 
+      end
+ 
+      # verify their teacher/student status for the course matches what we've got
+      roles = r.POST['custom_canvas_membership_roles']
+      teacher = roles['TeacherEnrollment'] || roles['DesignerEnrollment']
+      
+      course_id = r.POST['custom_canvas_course_id']
+      lti_enrollment = teacher ? 'teacher' : 'student'
+      session_enrollment = session.to_hash.dig('courses', course_id, 'role')
+      
+      if lti_enrollment != session_enrollment
+        session.replace API.userinfo(email)
+      end
+
+      # this hackery tell Roda to call the next app in the middleware stack
       throw :next, true
     end    
   end
