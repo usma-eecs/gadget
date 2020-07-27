@@ -82,7 +82,7 @@ class Gadget < Roda
       if session['courses'].nil? or session['courses'].empty?
         render :card, locals: {
           title: '¯\_(ツ)_/¯', 
-          text: "<b>#{session['email']}</b> isn't enrolled in any gadget-enabled courses. If you are logged in as the wrong user, "
+          text: "<b>#{session['email']}</b> isn't enrolled in any gadget-enabled courses. If you aren't logged in as the right user, then <a href='/logout'>log out and back in</a>."
         }
 
       # as a last ditch effort, if the user is only enrolled in one
@@ -93,9 +93,12 @@ class Gadget < Roda
       
       # whelp, that didn't work. Let the user know the situation ...
       else
+        course_list = session['courses'].map do |id, info|
+          "<br>&nbsp;&nbsp;&nbsp;&nbsp;&bull; #{info['name']} (#{id})"
+        end.join
         render :card, locals: {
           title: '¯\_(ツ)_/¯', 
-          text: "You are enrolled in multiple courses that support gadgets. Good for you! Normally, the gadget server can infer which course a gadget request if for. Unfortunately, it wasn't able to this time. Try passing the course ID in a <b>course</b> GET parameter. That usually works."
+          text: "<b>#{session['email']}</b> is enrolled in multiple courses that support gadgets: <br>#{course_list} <br><br>How great! Normally, the gadget server can infer which course a gadget request is for, but it wasn't able to this time. You can try passing the course ID in a <b>course</b> GET parameter. That usually works."
         }
       end
     end
@@ -110,7 +113,7 @@ class Gadget < Roda
       unless course = session.to_hash.dig('courses', course_id)
         r.halt 403, render(:card, locals: {
           title: '¯\_(ツ)_/¯', 
-          text: "You've requested a gadget from a course you are not enrolled in. If the course was created <i>after</i> you logged in, you might just need to <a href='/logout'>logout</a> and back in to see it."
+          text: "<b>#{session['email']}</b> is not enrolled in a course with an ID of <b>#{course_id}</b> or that course doesn't exist. If the course was created <i>after</i> you logged into the gadget server, you might just need to <a href='/logout'>log out and back in</a> to see it."
         })
       end
 
