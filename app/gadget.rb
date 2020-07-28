@@ -5,13 +5,19 @@ class Gadget < Roda
   plugin :halt
   plugin :pass
   plugin :caching
+  plugin :common_logger
   plugin :status_handler
   plugin :param_matchers
   plugin :header_matchers
   plugin :slash_path_empty
   plugin :render, engine: 'slim'
+
+  # don't cache non-asset pages ever
   plugin :default_headers, 
     'Cache-Control' => 'no-cache, no-store, must-revalidate'
+
+  # print nice exceptions if we're in development mode
+  plugin :exception_page if ENV['RACK_ENV'] == 'development'
 
   use RodaSessionMiddleware, 
     secret: ENV['SESSION_SECRET'], 
@@ -28,13 +34,6 @@ class Gadget < Roda
     }
   end
 
-  status_handler(500) do
-    render :card, locals: {
-      title: '¯\_(ツ)_/¯', 
-      text: "Something bad happened on the server. This is not your fault, but you should definitely let someone know anyway."
-    }
-  end
-
   route do |r|
     # TODO: remove this
     r.is('session') { session.to_hash.inspect }
@@ -47,17 +46,27 @@ class Gadget < Roda
     # LTI middleware authenticates the request before passing it here
     r.post 'lti/new' do
       course_id = r.POST['custom_canvas_course_id']
+      ends = session.to_hash.dig('courses',course_id,'ends')
+      
+      if ends and DateTime.parse(ends) < DateTime.now
+        r.halt 403, render(:card, locals: {
+          title: '¯\_(ツ)_/¯', 
+          text: "Sorry, #{session['courses'][course_id]['name']} has ended. You can't create new gadgets."
+        })
+      end
+
+      # r.params['file'][:tempfile]
       "Creating a new gadget for course #{course_id}."
     end
 
     # the course id isn't included in a gadget URL since we don't want 
     # to have to update every gadget URL every time we copy a course
     # downside: we now have to figure out what course the gadget is in
-    r.is String, String do |type, name|
-      
+    r.is String, String do |gadget_type, gadget_name|
+
       # you can provide the course id explicitly as a GET parameter
       r.on param: 'course' do |course_id|
-        r.redirect "/#{course_id}/#{type}/#{name}"
+        r.redirect "/#{course_id}/#{gadget_type}/#{gadget_name}"
       end
 
       # we can get the course id from the Referer header 
@@ -68,7 +77,7 @@ class Gadget < Roda
           match = uri.path.match(/\/courses\/(?<course_id>\d+)\/?/io)
           
           if match and match[:course_id]
-            r.redirect "/#{match[:course_id]}/#{type}/#{name}"
+            r.redirect "/#{match[:course_id]}/#{gadget_type}/#{gadget_name}"
           end
         end
 
@@ -89,12 +98,12 @@ class Gadget < Roda
       # gadget-enabled course, we'll assume the gadget is in that course
       elsif session['courses'].one?
         course_id = session['courses'].keys.first
-        r.redirect "#{course_id}/#{type}/#{name}"
+        r.redirect "#{course_id}/#{gadget_type}/#{gadget_name}"
       
       # whelp, that didn't work. Let the user know the situation ...
       else
-        course_list = session['courses'].map do |id, info|
-          "<br>&nbsp;&nbsp;&nbsp;&nbsp;&bull; #{info['name']} (#{id})"
+        course_list = session['courses'].map do |course_id, course_info|
+          "<br>&nbsp;&nbsp;&nbsp;&nbsp;&bull; #{course_info['name']} (#{course_id})"
         end.join
         render :card, locals: {
           title: '¯\_(ツ)_/¯', 
@@ -104,6 +113,8 @@ class Gadget < Roda
     end
 
     r.on Integer do |course_id|
+      # this may be a bug in Roda: sub-hashes in the session hash (courses)
+      # can't have integer keys. They are getting converted to strings
       course_id = course_id.to_s
 
       if session['email'].nil?
@@ -113,17 +124,24 @@ class Gadget < Roda
       unless course = session.to_hash.dig('courses', course_id)
         r.halt 403, render(:card, locals: {
           title: '¯\_(ツ)_/¯', 
-          text: "<b>#{session['email']}</b> is not enrolled in a course with an ID of <b>#{course_id}</b> or that course doesn't exist. If the course was created <i>after</i> you logged into the gadget server, you might just need to <a href='/logout'>log out and back in</a> to see it."
+          text: "<b>#{session['email']}</b> is not enrolled in a course with an ID of <b>#{course_id}</b> or that course doesn't exist. If the course was created <i>after</i> you logged into the gadget server, then you might just need to <a href='/logout'>log out and back in</a> to see it."
         })
       end
 
-      r.get String, String do |type, name|
-        "#{course_id}/#{type}/#{name}"
+      r.get String, String do |gadget_type, gadget_name|
+        "#{course_id}/#{gadget_type}/#{gadget_name}"
       end
 
-      r.post String, String do |type, name|
-        # no editing after course conclusion date
-        "#{course_id}/#{type}/#{name}"
+      r.post String, String do |gadget_type, gadget_name|
+        ends = session.to_hash.dig('courses',course_id,'ends')
+      
+        # don't accept edits for gadgets in concluded courses
+        # TODO: don't even show the 'Save' button
+        if ends and DateTime.parse(ends) < DateTime.now
+          r.halt 403, "Can't edit gadget it concluded course"
+        end
+
+        "#{course_id}/#{gadget_type}/#{gadget_name}"
       end      
     end    
   end

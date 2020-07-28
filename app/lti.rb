@@ -43,7 +43,6 @@ class LTI < Roda
         nonces.put_if_absent r.POST['oauth_nonce'], Time.now
       end
 
-      id = r.POST['custom_canvas_user_id']
       email = r.POST['lis_person_contact_email_primary']
 
       # their primary email address *must* be a westpoint.edu or we 

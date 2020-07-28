@@ -15,10 +15,7 @@ Slim::Engine.set_options pretty: true
 class CY105 < Roda
   plugin :header_matchers
   plugin :render, engine: 'slim'
-	plugin :public, headers: {'Last-Modified' => DateTime.now.httpdate}
-
-  use Rack::CommonLogger
-  use Rack::ShowExceptions if ENV['RACK_ENV'] == 'development'
+  plugin :public, headers: {'Last-Modified' => DateTime.now.httpdate}
 
   route do |r|
 		r.public

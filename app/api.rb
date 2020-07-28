@@ -1,4 +1,5 @@
 require 'http'
+require 'stringio'
 require 'connection_pool'
 
 class API
@@ -54,7 +55,8 @@ class API
     self.request :put, *args
   end
 
-  # returns a hash of enrollments for the user
+  # returns everything we need to know about a user
+  # this is what populates into the gadget servers session hash
   def self.userinfo email
     user_id = nil
 
@@ -73,7 +75,7 @@ class API
     # find which gadget courses this user is registered in and return
     # a mapping from course ids to booleans indicating if they have
     # elevated privileges in that course (teacher or course designer)
-    courses = gadget_courses.each_with_object({}) do |(course_id,course_info), hash|
+    courses = gadget_courses.each_with_object({}) do |(course_id,course), hash|
       users = API.get("/api/v1/courses/#{course_id}/search_users", params: { 
         search_term: email,
         'include[]' => 'enrollments'
@@ -86,10 +88,31 @@ class API
           ['DesignerEnrollment', 'TeacherEnrollment'].include? enrollment['type']
         end
 
-        hash[course_id] = course_info.merge('role' => teacher ? 'teacher' : 'student')
+        hash[course_id] = course.merge('role' => teacher ? 'teacher' : 'student')
       end
     end
 
     { 'id' => user_id, 'email' => email, 'courses' => courses }
+  end
+
+  # this upload the given contents to the course files at the 
+  # given path. Make sure the upload is authorized. 
+  def self.upload course_id, path, io
+    filename = File.basename(path)
+
+    token = API.post("/api/v1/courses/#{course_id}/files", params: {
+      content_type: 'text/plain',
+      on_duplicate: 'overwrite',
+      name: filename, 
+      parent_folder_path: File.dirname(path)
+    })
+
+    upload_url = token['upload_url']
+    upload_params = token['upload_params'] 
+    upload_params['file'] = HTTP::FormData::File.new(io)
+
+    # You can't use API pool because those are connected to canvas.instructure.com
+    # and we are uploading to some content distribution network node
+    HTTP.post(upload_url, form: upload_params)
   end
 end
