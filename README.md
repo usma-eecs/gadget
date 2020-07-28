@@ -25,3 +25,8 @@ tests.assertNoErrors()
 tests.run()</pre>
 </div>
 ```
+
+## TODO
+
+* The quiz stream, which let's instructors see individual edits a student made during a quiz, does not render. 
+* This does not work with New Quizzes. Someone with more knowledge of react will need to educate us on how to incorporate gadgets. 
