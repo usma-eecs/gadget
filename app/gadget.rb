@@ -56,6 +56,7 @@ class Gadget < Roda
       end
 
       # r.params['file'][:tempfile]
+      # make sure to lock the file after creating it!  
       "Creating a new gadget for course #{course_id}."
     end
 
@@ -102,12 +103,14 @@ class Gadget < Roda
       
       # whelp, that didn't work. Let the user know the situation ...
       else
-        course_list = session['courses'].map do |course_id, course_info|
-          "<br>&nbsp;&nbsp;&nbsp;&nbsp;&bull; #{course_info['name']} (#{course_id})"
+        course_links = session['courses'].map do |course_id, course_info|
+          gadget_path = "/#{course_id}/#{gadget_type}/#{gadget_name}"
+          course_link = "<a href='#{gadget_path}'>#{course_info['name']}</a>"
+          "<br>&nbsp;&nbsp;&nbsp;&nbsp;&bull; #{course_link}"
         end.join
         render :card, locals: {
           title: '¯\_(ツ)_/¯', 
-          text: "<b>#{session['email']}</b> is enrolled in multiple courses that support gadgets: <br>#{course_list} <br><br>How great! Normally, the gadget server can infer which course a gadget request is for, but it wasn't able to this time. You can try passing the course ID in a <b>course</b> GET parameter. That usually works."
+          text: "<b>#{session['email']}</b> is enrolled in multiple courses that support gadgets. How great! Click the course that the gadget you are after is in: <br> #{course_links}"
         }
       end
     end
@@ -128,21 +131,25 @@ class Gadget < Roda
         })
       end
 
-      r.get String, String do |gadget_type, gadget_name|
-        "#{course_id}/#{gadget_type}/#{gadget_name}"
-      end
-
-      r.post String, String do |gadget_type, gadget_name|
-        ends = session.to_hash.dig('courses',course_id,'ends')
-      
-        # don't accept edits for gadgets in concluded courses
-        # TODO: don't even show the 'Save' button
-        if ends and DateTime.parse(ends) < DateTime.now
-          r.halt 403, "Can't edit gadget it concluded course"
+      r.on 'personal', String do |gadget_name|
+        id = API.file_id("/gadgets/personal/#{gadget_name}.gadget")  
+        
+        r.get do 
+          
         end
 
-        "#{course_id}/#{gadget_type}/#{gadget_name}"
-      end      
+        r.post do 
+          ends = session.to_hash.dig('courses',course_id,'ends')
+        
+          # don't accept edits for gadgets in concluded courses
+          # TODO: don't even show the 'Save' button
+          if ends and DateTime.parse(ends) < DateTime.now
+            r.halt 403, "Can't edit gadget it concluded course"
+          end
+
+          "#{course_id}/#{gadget_type}/#{gadget_name}"
+        end
+      end
     end    
   end
 end

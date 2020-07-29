@@ -4,7 +4,15 @@ require 'connection_pool'
 
 class API
   include Singleton
-  class Error < StandardError; end
+
+  class UpstreamError < StandardError
+    attr_reader :status
+
+    def initialize(message, status)
+      @status = status
+      super(message)
+    end
+  end
 
   # a thread safe pool of persistent canvas connection
   POOL = ConnectionPool.new(size: 5, timeout: 5) do
@@ -27,7 +35,8 @@ class API
       end
     else
       response.flush
-      raise Error, "Canvas returned a (#{response.status}) error for #{args}"
+      status = response.status
+      raise UpstreamError.new("Canvas returned a #{status} error for #{args}", status)
     end
   end
 
@@ -95,6 +104,13 @@ class API
     { 'id' => user_id, 'email' => email, 'courses' => courses }
   end
 
+  # this downloads the given file. Make sure the download is authorized
+  def self.download course_id, path
+    files = API.get("/api/v1/courses/#{course_id}/files/", params: {search_term: path})
+    
+    # if file = files.find {|file_info|  
+  end
+
   # this upload the given contents to the course files at the 
   # given path. Make sure the upload is authorized. 
   def self.upload course_id, path, io
@@ -114,5 +130,44 @@ class API
     # You can't use API pool because those are connected to canvas.instructure.com
     # and we are uploading to some content distribution network node
     HTTP.post(upload_url, form: upload_params)
+  end
+
+  # this returns the folder id for the given path
+  # it will create the folder if it doesn't exist
+  # I'm thinking we should have an id cache. That would improve response time 
+  def self.folder_id course_id, path
+    path = path.squeeze('/').delete_prefix('/').delete_suffix('/')
+    
+    begin
+      folders = get "/api/v1/courses/#{course_id}/folders/by_path/#{path}"
+      folder = folders.last
+    rescue UpstreamError => ex
+      raise unless ex.status == 404
+      dirname = File.dirname(path)
+
+      folder = post("/api/v1/courses/#{course_id}/folders", params: {
+        hidden: true, 
+        locked: true, 
+        name: File.basename(path),
+        parent_folder_path: dirname == '.' ? '/' : dirname
+      })
+    end
+
+    folder['id']
+  end
+
+  # returns the file id or nil if it is not found
+  # I'm thinking we should have an id cache. That would improve response time 
+  def self.file_id course_id, path
+    path = path.squeeze('/').delete_prefix('/').delete_suffix('/')
+    filename = File.basename path
+    parent_id = folder_id course_id, File.dirname(path)
+
+    files = get("/api/v1/folders/#{parent_id}/files", params: {
+      search_term: filename
+    })
+    
+    file = files.find {|f| f['display_name'] == filename }
+    file ? file['id'] : nil
   end
 end
