@@ -15,11 +15,14 @@ Create a `.env` with:
 * CANVAS_API_TOKEN
 * Lot of other variables
 
+renaming gadgets: I don't recommends it, but here's how
 
-    # all gadgets have a type: personal, student, teacher, assessment
-    # gadgets are organized in the course files under type folders
-    
-    # the course id isn't included in a gadget URL since we don't want 
-    # to have to update every gadget URL every time we copy a course
+# all gadgets have a type: personal, student, teacher, assessment
+# gadgets are organized in the course files under type folders
 
-    template gadget
+# the course id isn't included in a gadget URL since we don't want 
+# to have to update every gadget URL every time we copy a course
+
+# You will want to delete the personal gadgets when you copy a course ...
+
+template gadget

@@ -25,7 +25,7 @@
       <lticm:options name="editor_button">
         <lticm:property name="url">https://gadget.it105.army/lti/new</lticm:property>
         <lticm:property name="icon_url">https://gadget.it105.army/images/icon.png</lticm:property>
-        <lticm:property name="text">Gadget</lticm:property>
+        <lticm:property name="text">New Gadget</lticm:property>
         <lticm:property name="visibility">public</lticm:property>
         <lticm:property name="enabled">true</lticm:property>
       </lticm:options>

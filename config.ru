@@ -4,10 +4,7 @@ require 'roda'
 require 'slim'
 require 'dotenv/load'
 
-require_relative 'app/api'
-require_relative 'app/lti'
 require_relative 'app/chat'
-require_relative 'app/o365'
 require_relative 'app/gadget'
 
 Slim::Engine.set_options pretty: true

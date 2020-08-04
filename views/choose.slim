@@ -1,0 +1,47 @@
+head
+    title New Gadget
+    meta charset="UTF-8"
+    link rel="stylesheet" href="/styles/bootstrap.css"
+    script src="/scripts/jquery.js"
+    
+    javascript:
+        function change() {
+            var selection = $('#type > option:selected').val();
+
+            if(selection != 'blank') {
+                var path = window.location.href + '/' + selection;
+                $.get(path).done(redirect => {
+                    console.log(redirect);
+                    window.location.href = redirect
+                }).fail(error => {
+                    console.log(error.responseText);
+                    alert('Error: ' + error.statusText + '. See console for details.');
+                });
+            }
+        }
+    
+body
+    center
+        br
+        br
+        .card.w-50 style="max-width: 500px"
+            .card-body
+                h3.card-title New Gadget
+                p.card-text.text-left 
+                    | Select the type of gadget you want to create: 
+                    select id='type' onchange="change()"
+                        option value='blank'
+                        option value='assessment' Assessment
+                        option value='teacher' Public
+                        option value='personal' Personal 
+                    ul.text-left
+                        li
+                            b Assessment Gadgets 
+                            | can be securely embedded in quizzes and assignments. 
+                        li
+                            b Public Gadgets 
+                            | are available to everyone, but can only be edited by teachers.
+                        li
+                            b Personal Gadgets 
+                            | are a private place for individuals to test and save their code. 
+                

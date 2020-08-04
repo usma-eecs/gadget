@@ -14,6 +14,12 @@ class API
     end
   end
 
+  class NotFound < UpstreamError
+    def initialize(message) 
+      super(message, 404)
+    end
+  end
+
   # a thread safe pool of persistent canvas connection
   POOL = ConnectionPool.new(size: 5, timeout: 5) do
     host = URI::HTTPS.build(host: 'canvas.instructure.com')
@@ -35,8 +41,12 @@ class API
       end
     else
       response.flush
-      status = response.status
-      raise UpstreamError.new("Canvas returned a #{status} error for #{args}", status)
+      case response.status
+      when 404
+        raise NotFound.new("#{args} not found")
+      else
+        raise UpstreamError.new("Canvas returned a #{status} error for #{args}", status)
+      end
     end
   end
 
@@ -106,21 +116,27 @@ class API
 
   # this downloads the given file. Make sure the download is authorized
   def self.download course_id, path
-    files = API.get("/api/v1/courses/#{course_id}/files/", params: {search_term: path})
-    
-    # if file = files.find {|file_info|  
+    if file_id = file_id(course_id, path)
+      response = API.get("/api/v1/files/#{file_id}/public_url")
+      warn response['public_url']
+      # You can't use API pool because those are connected to canvas.instructure.com
+      # and we are uploading to some content distribution network node
+      HTTP.follow.get(response['public_url']).body
+    end
   end
 
   # this upload the given contents to the course files at the 
   # given path. Make sure the upload is authorized. 
   def self.upload course_id, path, io
-    filename = File.basename(path)
+    dirname = File.dirname path
+    filename = File.basename path
+    parent_id = mkdir course_id, dirname
 
     token = API.post("/api/v1/courses/#{course_id}/files", params: {
       content_type: 'text/plain',
       on_duplicate: 'overwrite',
       name: filename, 
-      parent_folder_path: File.dirname(path)
+      parent_folder_id: parent_id
     })
 
     upload_url = token['upload_url']
@@ -132,28 +148,39 @@ class API
     HTTP.post(upload_url, form: upload_params)
   end
 
+  # recursively creates the given path if it doesn't already exist
+  # returns the target folder id
+  def self.mkdir course_id, path
+    path = path.squeeze('/').delete_prefix('/').delete_suffix('/')
+    
+    # folder exists
+    if id = folder_id(course_id, path)
+      return id
+
+    # create the folder
+    else
+      dirname = File.dirname path
+      parent_id = mkdir course_id, dirname
+
+      folder = post("/api/v1/courses/#{course_id}/folders", params: {
+        hidden: true, 
+        locked: true,
+        name: File.basename(path),
+        parent_folder_id: parent_id
+      })
+
+      return folder['id']
+    end
+  end
+
   # this returns the folder id for the given path
   # it will create the folder if it doesn't exist
   # I'm thinking we should have an id cache. That would improve response time 
   def self.folder_id course_id, path
     path = path.squeeze('/').delete_prefix('/').delete_suffix('/')
-    
-    begin
-      folders = get "/api/v1/courses/#{course_id}/folders/by_path/#{path}"
-      folder = folders.last
-    rescue UpstreamError => ex
-      raise unless ex.status == 404
-      dirname = File.dirname(path)
-
-      folder = post("/api/v1/courses/#{course_id}/folders", params: {
-        hidden: true, 
-        locked: true, 
-        name: File.basename(path),
-        parent_folder_path: dirname == '.' ? '/' : dirname
-      })
-    end
-
-    folder['id']
+    get("/api/v1/courses/#{course_id}/folders/by_path/#{path}").last['id']
+  rescue NotFound
+    nil
   end
 
   # returns the file id or nil if it is not found

@@ -17,6 +17,7 @@ GEM
     bindata (2.4.8)
     builder (3.2.4)
     coderay (1.1.3)
+    concode (0.1.1)
     concurrent-ruby (1.1.6)
     connection_pool (2.2.3)
     domain_name (0.5.20190701)
@@ -130,6 +131,7 @@ PLATFORMS
 
 DEPENDENCIES
   babosa
+  concode
   concurrent-ruby
   connection_pool
   dotenv
