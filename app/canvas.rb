@@ -2,7 +2,7 @@ require 'http'
 require 'stringio'
 require 'connection_pool'
 
-class API
+class Canvas
   include Singleton
 
   class UpstreamError < StandardError
@@ -81,8 +81,8 @@ class API
 
     # create a mapping of courses with gadgets enabled to dates that those 
     # courses end since we don't allow editing after course end
-    gadget_courses = API.get('/api/v1/courses').each_with_object({}) do |course, hash|
-      tools = API.get "/api/v1/courses/#{course['id']}/external_tools"
+    gadget_courses = get('/api/v1/courses').each_with_object({}) do |course, hash|
+      tools = get "/api/v1/courses/#{course['id']}/external_tools"
       
       if tools.any? {|tool| tool['consumer_key'] == ENV['LTI_KEY']}
         hash[course['id'].to_s] = { 
@@ -95,7 +95,7 @@ class API
     # a mapping from course ids to booleans indicating if they have
     # elevated privileges in that course (teacher or course designer)
     courses = gadget_courses.each_with_object({}) do |(course_id,course), hash|
-      users = API.get("/api/v1/courses/#{course_id}/search_users", params: { 
+      users = get("/api/v1/courses/#{course_id}/search_users", params: { 
         search_term: email,
         'include[]' => 'enrollments'
       })
@@ -114,14 +114,10 @@ class API
     { 'id' => user_id, 'email' => email, 'courses' => courses }
   end
 
-  # this downloads the given file. Make sure the download is authorized
-  def self.download course_id, path
+  # returns a downloads url for the given file
+  def self.download_url course_id, path
     if file_id = file_id(course_id, path)
-      response = API.get("/api/v1/files/#{file_id}/public_url")
-      warn response['public_url']
-      # You can't use API pool because those are connected to canvas.instructure.com
-      # and we are uploading to some content distribution network node
-      HTTP.follow.get(response['public_url']).body
+      get("/api/v1/files/#{file_id}/public_url")['public_url']
     end
   end
 
@@ -132,7 +128,7 @@ class API
     filename = File.basename path
     parent_id = mkdir course_id, dirname
 
-    token = API.post("/api/v1/courses/#{course_id}/files", params: {
+    token = post("/api/v1/courses/#{course_id}/files", params: {
       content_type: 'text/plain',
       on_duplicate: 'overwrite',
       name: filename, 
@@ -140,10 +136,10 @@ class API
     })
 
     upload_url = token['upload_url']
-    upload_params = token['upload_params'] 
+    upload_params = token['upload_params']
     upload_params['file'] = HTTP::FormData::File.new(io)
 
-    # You can't use API pool because those are connected to canvas.instructure.com
+    # You can't use Canvas pool because those are connected to canvas.instructure.com
     # and we are uploading to some content distribution network node
     HTTP.post(upload_url, form: upload_params)
   end

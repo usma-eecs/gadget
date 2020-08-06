@@ -2,6 +2,7 @@ require 'roda'
 require 'ims/lti'
 require 'seconds'
 require 'concurrent'
+require_relative 'canvas'
 
 class LTI < Roda
   plugin :halt
@@ -48,7 +49,8 @@ class LTI < Roda
       # their primary email address *must* be a westpoint.edu or we 
       # can't correlate between O365 logins and LTI logins      
       if email.nil? or not email.ends_with? '@westpoint.edu'
-        session.clear
+        # roda bug? - sending an empty session hash has no effect
+        session.replace(logout: true)
 
         r.halt 401, render(:card, locals: {
           title: '¯\_(ツ)_/¯', 
@@ -74,7 +76,7 @@ class LTI < Roda
       session_enrollment = session.to_hash.dig('courses', course_id, 'role')
       
       if lti_enrollment != session_enrollment
-        session.replace API.userinfo(email)
+        session.replace Canvas.userinfo(email)
       end
 
       # this hackery tell Roda to call the next app in the middleware stack

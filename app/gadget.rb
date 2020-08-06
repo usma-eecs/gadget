@@ -2,7 +2,8 @@ require 'roda'
 require 'roda/session_middleware'
 
 require_relative 'lti'
-# require_relative 'o365'
+require_relative 'o365'
+require_relative 'canvas'
 require_relative 'templates'
 
 class Gadget < Roda
@@ -30,7 +31,15 @@ class Gadget < Roda
 
   # authentication middlewares
   use LTI
-  # use O365
+  use O365
+
+  status_handler(401) do    
+    render :card, locals: {
+      title: 'Gadget Login',
+      text: "<script>setTimeout(()=>window.parent.location.href='#{env['PATH_INFO']}',5000)</script>Click the button below to log into your westpoint.edu. The gadget will automatically load once you've logged in.",
+      button: { 'Log in with Office 365' => 'javascript:window.open("/o365/login")' }
+    }
+  end
 
   status_handler(404) do    
     render :card, locals: {
@@ -41,7 +50,22 @@ class Gadget < Roda
 
   route do |r|
     # TODO: remove this
-    r.is('session') { session.to_hash.inspect }
+    r.on 'session' do
+      unless ENV['RACK_ENV'] == 'development'
+        r.halt 403, 'Sorry hacker - the session editor for development only'
+      end
+
+      require 'awesome_print'
+
+      r.post do
+        session.replace eval(r.POST['session'])
+        "<p>Updated!</p><form method=post><textarea name=session rows=20 cols=75>#{session.to_hash.ai(plain: true)}</textarea><br><input type=submit></form>"
+      end
+
+      r.get do
+        "<form method=post><textarea name=session rows=20 cols=75>#{session.to_hash.ai(plain: true)}</textarea><br><input type=submit></form>" 
+      end
+    end
 
     r.get 'favicon.ico' do 
       r.redirect '/images/gadget-favicon.ico'
@@ -77,7 +101,7 @@ class Gadget < Roda
         course_id = token['course_id']
 
         if token.nil? or DateTime.parse(token['time']) < 1.minute.ago
-          r.halt 403, render(:card, locals: {
+          r.halt 401, render(:card, locals: {
             title: '¯\_(ツ)_/¯', 
             text: "LTI authorization is missing, invalid, or expired."
           })
@@ -110,11 +134,11 @@ class Gadget < Roda
         end
 
         # personal gadgets don't actually have a template instance, just a folder
-        # they're templates are instantiated when a user requests it the first time
+        # they're templates are instantiated per user as they request it
         if type == 'personal'
-          API.mkdir File.dirname(gadget_path)
+          Canvas.mkdir File.dirname(gadget_path)
         else
-          API.upload course_id, gadget_path, Templates.get_template_io(type)
+          Canvas.upload course_id, gadget_path, Templates.get_template_io(type)
         end
 
         # the gadget now exists, send them to the redirect URL 
@@ -131,7 +155,7 @@ class Gadget < Roda
           url: gadget_url,
           return_type: 'iframe'
         )
-
+        
         return_url.to_s
       end
     end
@@ -161,14 +185,12 @@ class Gadget < Roda
         r.pass
       end
 
-      if session['email'].nil?
-        r.redirect "/o365/login?return=#{env['PATH_INFO']}"
-      end
+      r.halt 401 if session['email'].nil?
 
       if session['courses'].nil? or session['courses'].empty?
         render :card, locals: {
           title: '¯\_(ツ)_/¯', 
-          text: "<b>#{session['email']}</b> isn't enrolled in any gadget-enabled courses. If you aren't logged in as the right user, then <a href='/logout'>log out and back in</a>."
+          text: "<b>#{session['email']}</b> isn't enrolled in any gadget-enabled courses. If you aren't logged in as the right user, then <a href='/o365/logout'>log out and back in</a>."
         }
 
       # as a last ditch effort, if the user is only enrolled in one
@@ -196,36 +218,36 @@ class Gadget < Roda
       # this may be a bug in Roda: sub-hashes in the session hash (e.g. courses)
       # can't have integer keys. They are getting converted to strings
       course_id = course_id.to_s
+      role = session.to_hash.dig('courses', course_id, 'role');
 
-      if session['email'].nil?
-        r.redirect "/o365/login?return=#{env['PATH_INFO']}"
-      end
+      r.halt 401 if session['email'].nil?
 
-      if session.to_hash.dig('courses', course_id).nil?
+      if role.nil?
         r.halt 403, render(:card, locals: {
           title: '¯\_(ツ)_/¯', 
-          text: "<b>#{session['email']}</b> is not enrolled in a course with an ID of <b>#{course_id}</b> or that course doesn't exist. If the course was created <i>after</i> you logged into the gadget server, then you might just need to <a href='/logout'>log out and back in</a> to see it."
+          text: "<b>#{session['email']}</b> is not enrolled in a course with an ID of <b>#{course_id}</b> or that course doesn't exist. If the course was created <i>after</i> you logged into the gadget server, then you might just need to <a target='_blank' href='/o365/logout'>log out and back in</a> to see it."
         })
       end
 
-      # instead of proxying downloads/uploads, I could give the JS client the url and
-      # token and they could upload/download directly (for an hour, at least)
-      r.on ['assessment', 'personal', 'teacher', 'student'], String do |type, name|
-        r.get do
-          if type == 'teacher' or type == 'student'
-            path = "gadgets/#{type}/#{name}.gadget"
-          end
+      # these are the public gadgets anyone in the class may see
+      r.on ['teacher', 'student'], String do |type, name|
+        path = "gadgets/#{type}/#{name}.gadget"        
+        r.halt 404 if Canvas.file_id(course_id, path).nil?
 
-          if API.file_id(course_id, path).nil?
-            r.halt 404 
-          else
-            stream do |out| 
-              API.download(course_id, path).each {|chunk| out << chunk}
-            end
-          end
+        r.get do
+          render :gadget, locals: {
+            save: role == type, 
+            admin: role == 'teacher',
+            url: Canvas.download_url(course_id, path)
+          }
         end
 
-        r.post do 
+        # right now we proxy posts to enforce no editing after quiz ends
+        r.post do
+          if role != type
+            r.halt 403, "#{role}s cannot edit #{type} gadgets"
+          end
+
           ends = session.to_hash.dig('courses',course_id,'ends')
         
           # don't accept edits for gadgets in concluded courses
@@ -233,10 +255,15 @@ class Gadget < Roda
           if ends and DateTime.parse(ends) < DateTime.now
             r.halt 403, "course ended - gadgets locked"
           end
-
-          # r.params['file'][:tempfile]
-          # make sure to lock the file after creating it!
-          "#{course_id}/#{type}/#{name}"
+          # require 'pry'
+          # binding.pry
+          # r.body is a Rack::Lint::Input, but I need an IO
+          # Rack::Lint::Input *wraps* a StringIO, @input
+          # hopefully this doesn't cause some memory leak ...
+          io = r.body.instance_variable_get :@input
+          response = Canvas.upload course_id, path, io
+          
+          r.halt response.status, response.reason
         end
       end
     end    

@@ -2,8 +2,6 @@ doctype html
 
 html 
   head
-    title name
-
     css:
       html, body, iframe {
         height: 100%;
@@ -15,5 +13,5 @@ html
       }
 
   body
-    iframe src="/gadget/index.html" allowfullscreen="true"
-      | gadget
+    - data_attributes = locals.map{|k,v| ["data-#{k}", v]}.to_h
+    iframe src="/gadget/index.html" allowfullscreen="true" *data_attributes

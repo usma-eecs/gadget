@@ -18,4 +18,5 @@ gem 'connection_pool'
 group 'development' do 
   gem 'pry'
   gem 'rerun'
+  gem 'awesome_print'
 end

@@ -1,5 +1,4 @@
 head
-    title #{title}
     meta charset="UTF-8"
     link rel="stylesheet" href="/styles/bootstrap.css"
     script src="/scripts/jquery.js"
@@ -10,7 +9,8 @@ body
         br
         .card.w-50 style="max-width: 500px"
             .card-body
-                h3.card-title #{title}
+                - if defined? title
+                    h3.card-title #{title}
                 p.card-text.text-left #{{text}} 
                 - if defined? button
                     - name, href = button.first

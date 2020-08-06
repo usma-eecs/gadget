@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html lang="en" class="no-js">
 <head>
-    <title>Gadget Editor</title>
+    <title>Gadget</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
@@ -74,15 +74,11 @@
     </script>
 </head>
 
-<body id="embed_content_python" data-no-metrics="false" data-assignment="false" data-view-only="false" class="mode-standard  remixable" data-is-mobile="false">
+<body id="embed_content_python" data-no-metrics="false" data-assignment="false" data-view-only="false" class="mode-standard remixable" data-is-mobile="false">
 
     <script>
-      if ((typeof gadgetObject === 'undefined') || !gadgetObject) { 
-        gadgetObject = {
-            settings: {},
-            description: ''
-        } 
-      }
+        // some of the gadget libraries assume gadgetObject exists
+        gadgetObject = { settings: {}, description: '' } 
     </script>
 
 <!-- this can used to make urllib.requests work like in python -->
@@ -122,6 +118,11 @@
                         <a class='menu-button font-size item allow-original' data-action="code.fontsize" onclick="var swap=$(this).data('data'); $(this).data('data',$(this).data('last')); $(this).data('last',swap)" data-last="2em" data-data="1em">
                           aA
                           <label class="show-for-large-up">Font</label>
+                        </a>
+
+                        <a class='menu-button item allow-original' href="/o365/logout" role="button" aria-label="Logout" tabindex="0">
+                            <i class="fa fa-sign-out"></i>
+                            <label class="show-for-large-up">Logout</label>
                         </a>
                     </div>
                 </section>
@@ -229,7 +230,7 @@
     <div id="confirmResetModal" class="reveal-modal medium" data-reveal data-css-top="35">
         <div class="row">
             <h2 id="modalTitle">Are you sure?</h2>
-            <p class="lead">Resetting will undo all of your current changes.</p>
+            <p class="lead">Resetting will undo all of your changes since this gadget was initially loaded.</p>
             <a class="button caution menu-button allow-original" data-action="code.cancel-reset">Cancel</a>
             <a class="button danger menu-button allow-original" data-action="code.confirm-reset">Yes, I am sure.</a>
             <a class="close-reveal-modal" aria-label="Close">&#215;</a>

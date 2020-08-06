@@ -21,27 +21,28 @@ head
         }
     
 body
+    br
     center
-        br
-        br
-        .card.w-50 style="max-width: 500px"
+        .card.w-50 style="width: 600px"
             .card-body
-                h3.card-title New Gadget
                 p.card-text.text-left 
                     | Select the type of gadget you want to create: 
-                    select id='type' onchange="change()"
-                        option value='blank'
-                        option value='assessment' Assessment
-                        option value='teacher' Public
-                        option value='personal' Personal 
-                    ul.text-left
-                        li
-                            b Assessment Gadgets 
-                            | can be securely embedded in quizzes and assignments. 
-                        li
-                            b Public Gadgets 
-                            | are available to everyone, but can only be edited by teachers.
-                        li
-                            b Personal Gadgets 
-                            | are a private place for individuals to test and save their code. 
+
+                select id='type' onchange="change()"
+                    option value='blank'
+                    option value='assessment' Assessment
+                    option value='teacher' Public
+                    option value='personal' Personal 
+                br
+                br
+                ul.text-left
+                    li
+                        b Assessment Gadgets 
+                        | can be securely embedded in quizzes and assignments. 
+                    li
+                        b Public Gadgets 
+                        | are available to everyone, but can only be edited by teachers.
+                    li
+                        b Personal Gadgets 
+                        | are a private place for individuals to test and save their code. 
                 

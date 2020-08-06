@@ -56,7 +56,7 @@ $(() => {
         );
       }
 
-      return gadget.html();
+      return gadget.get(0).outerHTML;
     },
     getInstructions: function() {
       return this._gadget.description
@@ -75,147 +75,140 @@ $(() => {
     return false;
   });
 
-  var messages = {};
+  // render options are data tags on the iframe
+  // the "!= undefined" is so we can check admin == false
+  // when it's undefined and get the expected result
+  var url = $(window.frameElement).data('url');
+  var save = $(window.frameElement).data('save') != undefined;
+  var admin = $(window.frameElement).data('admin') != undefined;
+  var autosave = $(window.frameElement).data('autosave') != undefined;
+  var readonly = $(window.frameElement).data('readonly') != undefined; 
 
-  // receive editor updates
-  $(window).on('message', event => {
-    var original = event.originalEvent;
-    var message = original.data;
-    
-    // acknowledge this message
-    original.source.postMessage({id: message.id, type: 'ack'}, original.origin);
+  $.get(url)
+    .fail(error => {
+      alert('Error: ' + error.statusText + '. See console for details.');
+    })
+    .done(html => {
+      var gadget = $(html);
+      var activeTab = false;;
+      
+      var config = {
+        code: [],
+        description: '',
+        settings: { role: admin ? 'owner' : 'guest' }
+      };
 
-    if (messages[message.id]) {
-      console.log("gadget: ignoring duplicate " + message.type + " message " + message.id);
-    } else {
-      messages[message.id] = true;
-      console.log("gadget: received " + message.type + " message " + message.id);
-
-      if (message.type == 'init') {
-        // an initialization message contains the gadget HTML
-        var gadget = $('<div>').html(message.data);
-        
-        var activeTab = false;
-        var admin = message.admin;
-        var readonly = message.readonly;
-        
-        var config = {
-          code: [],
-          description: '',
-          settings: { role: admin ? 'owner' : 'guest' }
-        };
-  
-        gadget.children('pre').each((i,pre) => {
-          if (pre.id == 'instructions.md') {
-            config.description = pre.textContent;
-          } else {
-            config.code.push({
-              name: pre.id,
-              content: pre.textContent,
-              hidden: pre.classList.contains('hidden')
-            });
-          }
-          if (pre.classList.contains('active')) {
-            // don't reveal the active tab unless they're admin
-            if (!admin && pre.classList.contains('hidden')) {
-              activeTab = pre.id;
-            }
-          }
-        });
-  
-        config.code = JSON.stringify(config.code);
-
-        GadgetApp._gadget = config;
-        GadgetApp._original = config;
-        GadgetApp.reset(config);
-
-        if (activeTab) {
-          GadgetApp.getEditor().selectFile(activeTab)
-        }
-        
-        if (admin != true) {
-          // the only time a gadget is read-only is when an admin
-          // is editing a quiz, so they can see hidden files despite 
-          // not being in an owner context 
-          if (readonly != true) {
-            $('.hidden-file-indicator').closest('.tab').hide();
-          }
-
-          $('.tab-options-link').hide();
-          $('.right-options').hide();
-          $('#instructionsActions').hide();
-        }
-
-        if (readonly) {
-          $('#instructionsActions').hide();
-          $('.ace_text-input').attr('disabled', true)
+      gadget.children('pre').each((i,pre) => {
+        if (pre.id == 'instructions.md') {
+          config.description = pre.textContent;
         } else {
-          // reveal the reset button
-          $('.reset-it').removeClass('hide');
+          config.code.push({
+            name: pre.id,
+            content: pre.textContent,
+            hidden: pre.classList.contains('hidden')
+          });
         }
-
-        // hide instructions tab if there aren't any
-        if (GadgetApp.getInstructions() || (admin  && !readonly)) {
-          GadgetApp.showInstructions();
-        } else { 
-          $('#codeOutputTab').css('width', '100%');
-        }
-
-        if (GadgetApp.getEditor().hasFile('tests.py')) {
-          GadgetApp.toggleCheckButton();
-
-          if (!GadgetApp.getInstructions()) {
-            GadgetApp.showTestResult();
+        if (pre.classList.contains('active')) {
+          // don't reveal a hidden active tab unless they're admin
+          if (!admin && pre.classList.contains('hidden')) {
+            activeTab = pre.id;
           }
         }
+      });
 
-        // sends an updated gadget
-        function sendEdits() {
-          var save = {
-            id: message.id, 
-            type: 'update', 
-            data: GadgetApp.toHTML()
-          };
-          
-          console.log("gadget: sending gadget update");
-          original.source.postMessage(save, original.origin);
+      config.code = JSON.stringify(config.code);
+
+      GadgetApp._gadget = config;
+      GadgetApp._original = config;
+      GadgetApp.reset(config);
+
+      if (activeTab) {
+        GadgetApp.getEditor().selectFile(activeTab)
+      }
+      
+      if (admin == false) {
+        // the only time a gadget is read-only is when an admin
+        // is editing a quiz, so they can see hidden files despite 
+        // not being in an owner context 
+        if (readonly == false) {
+          $('.hidden-file-indicator').closest('.tab').hide();
         }
 
-        if (message.edit) {
-          var editted = false;
-          GadgetApp.onEdit(() => editted = true);
-          
-          setInterval(() => {
-            if (editted) { 
-              editted = false;
-              sendEdits()
-            }
-          }, 1000);
-        } else if (message.save) {
-          $('.save-it').removeClass('hide');
+        $('.tab-options-link').hide();
+        $('.right-options').hide();
+        $('#instructionsActions').hide();
+      }
 
-          // add save keyboard shortcut
-          GadgetApp.getEditor().addCommand("save", {
-            win: "Ctrl-s",
-            mac: "Command-s"
-          }, () => $('.save-it').click());
+      if (readonly) {
+        $('#instructionsActions').hide();
+        $('.ace_text-input').attr('disabled', true)
+      } else {
+        // reveal the reset button
+        $('.reset-it').removeClass('hide');
+      }
 
-          GadgetApp.onEdit(() => { 
-            $('.save-it > label').text("Save");
-            $('.save-it').removeClass('disabled');
-          });
-          
-          $('.save-it').click(() => {
-            $('.save-it')
-              .addClass('disabled blue-highlight')
-              .css('background-color', '')
-              .children('label').text("Saving...");
+      // hide instructions tab if there aren't any
+      if (GadgetApp.getInstructions() || (admin && !readonly)) {
+        GadgetApp.showInstructions();
+      } else { 
+        $('#codeOutputTab').css('width', '100%');
+      }
 
-            sendEdits();
-            $('.save-it > label').text("Saved");
-          });
+      if (GadgetApp.getEditor().hasFile('tests.py')) {
+        GadgetApp.toggleCheckButton();
+
+        if (!GadgetApp.getInstructions()) {
+          GadgetApp.showTestResult();
         }
       }
-    }
-  });
+
+      function saveChanges() {
+        $.post(
+          window.parent.location.pathname, 
+          GadgetApp.toHTML()
+        ).done(
+          () => $('.save-it > label').text("Saved")
+        ).fail(error => {
+            console.log(error.responseText);
+            $('.save-it').removeClass('disabled');
+            $('.save-it > label').text("Error");
+            $('.save-it').removeClass('blue-highlight');
+            $('.save-it').css('background-color', 'red')
+          });
+      }
+
+      if (autosave == true) {
+        var editted = false;
+        GadgetApp.onEdit(() => editted = true);
+        
+        setInterval(() => {
+          if (editted) { 
+            editted = false;
+            saveChanges();
+          }
+        }, 1000);
+      } else if (save == true) {
+        $('.save-it').removeClass('hide');
+
+        // add save keyboard shortcut
+        GadgetApp.getEditor().addCommand("save", {
+          win: "Ctrl-s",
+          mac: "Command-s"
+        }, () => $('.save-it').click());
+
+        GadgetApp.onEdit(() => { 
+          $('.save-it > label').text("Save");
+          $('.save-it').removeClass('disabled');
+        });
+        
+        $('.save-it').click(() => {
+          $('.save-it')
+            .addClass('disabled blue-highlight')
+            .css('background-color', '')
+            .children('label').text("Saving...");
+
+          saveChanges();
+        });
+      }
+    });
 });

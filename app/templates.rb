@@ -2,7 +2,7 @@ require 'http'
 require 'concode'
 require 'stringio'
 require 'securerandom'
-require_relative 'api'
+require_relative 'canvas'
 
 class Templates
   # returns an IO containing the gadget template for the given type
@@ -16,17 +16,17 @@ class Templates
     # looks like the TEMPLATE_URI broke :(
     else
       warn "WARNING: missing #{type}.gadget template at #{uri}"
-      template = File.join(__dir__, '../templates', "#{type}.gadget")
-      StringIO.new template
+      path = File.join(__dir__, '../templates', "#{type}.gadget")
+      File.open(path)
     end
   end
 
   def self.generate_unique_gadget_name course_id
-    root_id = API.mkdir course_id, 'gadgets'
+    root_id = Canvas.mkdir course_id, 'gadgets'
     generator = Concode::Generator.new words: 2, glue: '-'
     gadget_name = generator.generate SecureRandom.uuid
 
-    files = API.get("/api/v1/folders/#{root_id}/files", params: {
+    files = Canvas.get("/api/v1/folders/#{root_id}/files", params: {
       search_term: gadget_name
     })
 

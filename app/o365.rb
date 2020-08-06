@@ -1,6 +1,7 @@
 require 'roda'
 require 'securerandom'
 require 'openid_connect'
+require_relative 'canvas'
 
 class O365 < Roda
   plugin :halt
@@ -8,26 +9,21 @@ class O365 < Roda
   plugin :param_matchers
   plugin :render, engine: 'slim'
 
-  # You have to use the "common" provider if you want users outside your
-  # tenant domain: My tenant is netgrok.org but users are in westpoint.edu. 
-  # 
-  # auth responses will come from another tenant - not common - so 
-  # the common discovery URLs have an annoying {tenantid} interpolation 
-  # variable in them that breaks issuer validation. 
-  # 
-  # So I do discovery like this to bypass issuer validation. It's not a 
-  # security risk, it's just super-annoying. ¯\_(ツ)_/¯
-  discover = OpenIDConnect::Discovery::Provider::Config::Resource.new(
-    URI(ENV['OPENID_COMMON_PROVIDER'])
-  ).discover!
-
   route do |r|
-    r.get 'logout' do 
-      session.clear
-      r.redirect discover.end_session_endpoint
-    end
-
     r.on 'o365' do
+      # You have to use the "common" provider if you want users outside your
+      # tenant domain: My tenant is netgrok.org but users are in westpoint.edu. 
+      # 
+      # auth responses will come from another tenant - not common - so 
+      # the common discovery URLs have an annoying {tenantid} interpolation 
+      # variable in them that breaks issuer validation. 
+      # 
+      # So I do discovery like this to bypass issuer validation. It's not a 
+      # security risk, it's just super-annoying. ¯\_(ツ)_/¯
+      discover = OpenIDConnect::Discovery::Provider::Config::Resource.new(
+        URI(ENV['OPENID_COMMON_PROVIDER'])
+      ).discover!
+
       client = OpenIDConnect::Client.new(
         identifier: ENV['OPENID_CLIENT_ID'],
         secret: ENV['OPENID_CLIENT_SECRET'],
@@ -37,9 +33,8 @@ class O365 < Roda
         userinfo_endpoint: discover.userinfo_endpoint
       )
 
-      r.get 'login', param: 'return' do |path|
+      r.get 'login' do |path|
         session.clear
-        session['return'] = path
         session['nonce'] = SecureRandom.uuid
 
         r.redirect client.authorization_uri(
@@ -49,6 +44,18 @@ class O365 < Roda
           # prevents users from signing in with a non-westpoint.edu account
           domain_hint: 'westpoint.edu'
         )
+      end
+
+      r.get 'logout' do 
+        # roda bug? - sending an empty session hash has no effect
+        session.replace(logout: true)
+        redirect = discover.end_session_endpoint
+  
+        render(:card, locals: {
+          title: 'Logged out',
+          text: "<script>window.open('#{redirect}')</script>To change users, you need to sign out of your westpoint.edu account using the popup. If the popup was blocked, click <a target='_blank' href='#{redirect}'>here</a> to open it again.",
+          button: { 'Log back in' => "javascript:window.parent.location.reload()" }
+        })
       end
 
       r.get 'callback' do
@@ -79,10 +86,13 @@ class O365 < Roda
         end
 
         email = access_token.userinfo!.email
-        session.update API.userinfo(email)
+        session.update Canvas.userinfo(email)
 
-        # return the user to where ever they were originally headed 
-        r.redirect session.delete('return')
+        render :card, locals: {
+          title: 'Success',
+          text: 'You are logged in. It is a good idea to refresh any pages containing gadgets.',
+          button: { 'Done' => 'javascript:window.close()' }
+        }
       end
     end
   end
