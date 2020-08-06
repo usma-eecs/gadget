@@ -2,6 +2,7 @@ require 'http'
 require 'stringio'
 require 'connection_pool'
 
+# TODO: cache path ids
 class Canvas
   include Singleton
 

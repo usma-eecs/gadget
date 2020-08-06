@@ -119,7 +119,7 @@ class Gadget < Roda
             })
           end
 
-          gadget_path = "gadgets/#{type}/#{gadget_name}.gadget"
+          path = "gadgets/#{type}/#{gadget_name}.gadget"
           
         # assessment or personal types
         else 
@@ -130,15 +130,15 @@ class Gadget < Roda
             })
           end
 
-          gadget_path = "gadgets/#{type}/#{gadget_name}/#{gadget_name}.gadget"
+          path = "gadgets/#{type}/#{gadget_name}/#{gadget_name}.gadget"
         end
 
         # personal gadgets don't actually have a template instance, just a folder
         # they're templates are instantiated per user as they request it
         if type == 'personal'
-          Canvas.mkdir File.dirname(gadget_path)
+          Canvas.mkdir course_id, File.dirname(path)
         else
-          Canvas.upload course_id, gadget_path, Templates.get_template_io(type)
+          Canvas.upload course_id, path, Templates.get_template_io(type)
         end
 
         # the gadget now exists, send them to the redirect URL 
@@ -229,40 +229,63 @@ class Gadget < Roda
         })
       end
 
+      ends = session.to_hash.dig('courses',course_id,'ends')
+      course_ended = ends && DateTime.parse(ends) < DateTime.now
+
       # these are the public gadgets anyone in the class may see
       r.on ['teacher', 'student'], String do |type, name|
-        path = "gadgets/#{type}/#{name}.gadget"        
+        path = "gadgets/#{type}/#{name}.gadget"      
         r.halt 404 if Canvas.file_id(course_id, path).nil?
+
+        can_save = role == type && !course_ended
+        
+        r.get do
+          render :gadget, locals: {
+            save: can_save,
+            admin: role == 'teacher',
+            url: Canvas.download_url(course_id, path) 
+          }
+        end
+
+        r.post do
+          unless can_save
+            r.halt 403, "this gadget is locked for editing" 
+          end
+
+          # r.body is a Rack::Lint::Input, but I need an IO
+          # Rack::Lint::Input *wraps* a StringIO, @input
+          io = r.body.instance_variable_get :@input
+
+          response = Canvas.upload course_id, path, io
+          r.halt response.status, response.reason
+        end
+      end
+
+      r.on 'personal', String do |name|
+        path = "gadgets/personal/#{name}/#{session['email']}"
+        folder = Canvas.folder_id(course_id, File.dirname(path))
+        r.halt 404 if folder.nil?
+        
+        if Canvas.file_id(course_id, path).nil?
+          Canvas.upload course_id, path, Templates.get_template_io(:personal)
+        end
 
         r.get do
           render :gadget, locals: {
-            save: role == type, 
-            admin: role == 'teacher',
+            admin: true,
+            save: !course_ended,
             url: Canvas.download_url(course_id, path)
           }
         end
 
-        # right now we proxy posts to enforce no editing after quiz ends
-        r.post do
-          if role != type
-            r.halt 403, "#{role}s cannot edit #{type} gadgets"
-          end
-
-          ends = session.to_hash.dig('courses',course_id,'ends')
-        
-          # don't accept edits for gadgets in concluded courses
-          # TODO: don't even show the 'Save' button
-          if ends and DateTime.parse(ends) < DateTime.now
-            r.halt 403, "course ended - gadgets locked"
-          end
-          # require 'pry'
-          # binding.pry
+        r.post do 
+          r.halt 403, "course ended" if course_ended
+          
           # r.body is a Rack::Lint::Input, but I need an IO
           # Rack::Lint::Input *wraps* a StringIO, @input
-          # hopefully this doesn't cause some memory leak ...
           io = r.body.instance_variable_get :@input
+
           response = Canvas.upload course_id, path, io
-          
           r.halt response.status, response.reason
         end
       end
