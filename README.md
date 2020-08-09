@@ -13,6 +13,8 @@ Create a `.env` with:
 * LTI_KEY
 * LTI_SECRET
 * CANVAS_API_TOKEN
+  * This token must belong to someone with the teacher role in *all* courses you want to render gadgets in. 
+  * If you have paid canvas, then you can issue a token with the appropriate privileges
 * Lot of other variables
 
 renaming gadgets: I don't recommends it, but here's how

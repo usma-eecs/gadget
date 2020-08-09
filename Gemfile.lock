@@ -23,6 +23,7 @@ GEM
     domain_name (0.5.20190701)
       unf (>= 0.0.5, < 1.0.0)
     dotenv (2.7.6)
+    dry-inflector (0.2.0)
     faraday (0.17.3)
       multipart-post (>= 1.2, < 3)
     faraday_middleware (0.14.0)
@@ -135,6 +136,7 @@ DEPENDENCIES
   concurrent-ruby
   connection_pool
   dotenv
+  dry-inflector
   http
   ims-lti
   message_bus

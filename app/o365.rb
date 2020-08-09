@@ -50,12 +50,16 @@ class O365 < Roda
         # roda bug? - sending an empty session hash has no effect
         session.replace(logout: true)
         redirect = discover.end_session_endpoint
-  
-        render(:card, locals: {
-          title: 'Logged out',
-          text: "<script>window.open('#{redirect}')</script>To change users, you need to sign out of your westpoint.edu account using the popup. If the popup was blocked, click <a target='_blank' href='#{redirect}'>here</a> to open it again.",
-          button: { 'Log back in' => "javascript:window.parent.location.reload()" }
-        })
+        
+        if r.GET['close']
+          r.redirect redirect
+        else
+          render(:card, locals: {
+            title: 'Logged out',
+            text: "<script>window.open('#{redirect}')</script>To change users, you need to sign out of your westpoint.edu account using the popup. If the popup was blocked, click <a target='_blank' href='#{redirect}'>here</a> to open it again.",
+            button: { 'Log back in' => "javascript:window.parent.location.reload()" }
+          })
+        end
       end
 
       r.get 'callback' do

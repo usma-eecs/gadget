@@ -63,7 +63,7 @@ class LTI < Roda
       if session['email'] and email != session['email']
         r.halt 401, render(:card, locals: {
           title: '¯\_(ツ)_/¯', 
-          text: "<b>#{email}</b> is logged into Canvas, but <b>#{session['email']}</b> is currently logged into the gadget server.<br><br>You can fix this by <a href='/logout'>logging out of the gadget server</a>."
+          text: "<b>#{email}</b> is logged into Canvas, but <b>#{session['email']}</b> is currently logged into the gadget server.<br><br>You can fix this by <a href='/o365/logout?close=true' target='_blank'>logging out of the gadget server</a> then creating the gadget again."
         }) 
       end
  

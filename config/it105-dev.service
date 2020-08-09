@@ -9,7 +9,7 @@ Type=simple
 WorkingDirectory=/root/it105/
 Environment=RACK_ENV=development
 ExecStartPre=/root/.rbenv/shims/bundle 
-ExecStart=/root/.rbenv/shims/bundle exec "rerun 'puma -b tcp://0.0.0.0:9292 config.ru'"
+ExecStart=/root/.rbenv/shims/bundle exec "rerun 'puma -q -b tcp://0.0.0.0:9292 config.ru'"
 ExecStop=/bin/kill -- $MAINPID
 Restart=always
 

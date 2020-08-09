@@ -11,7 +11,7 @@ body
             .card-body
                 - if defined? title
                     h3.card-title #{title}
-                p.card-text.text-left #{{text}} 
+                p.card-text.text-left #{{text}}
                 - if defined? button
                     - name, href = button.first
                     - if defined? new_window

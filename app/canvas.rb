@@ -2,6 +2,9 @@ require 'http'
 require 'stringio'
 require 'connection_pool'
 
+# used by Canvas::API to pluralize
+require 'dry/inflector' 
+
 # TODO: cache path ids
 class Canvas
   include Singleton
@@ -42,9 +45,10 @@ class Canvas
       end
     else
       response.flush
-      case response.status
+      
+      case status = response.status
       when 404
-        raise NotFound.new("#{args} not found")
+        raise NotFound, "#{args} not found"
       else
         raise UpstreamError.new("Canvas returned a #{status} error for #{args}", status)
       end
@@ -57,8 +61,17 @@ class Canvas
       params[:params][:page] = 1
 
       Enumerator.new do |y|
-        until (json = self.request :get, *args, **params).empty?
-          json.each {|j| y << j}
+        loop do 
+          json = self.request :get, *args, **params
+
+          if paginate == true
+            break if json.empty?
+            json.each {|j| y << j}
+          else
+            break if json[paginate].empty?
+            json[paginate].each {|j| y << j}
+          end
+
           params[:params][:page] += 1
         end
       end
@@ -73,6 +86,42 @@ class Canvas
 
   def self.put *args 
     self.request :put, *args
+  end
+
+  # I couldn't resist putting some totally unnecessary ruby magic 
+  # in here so this builds the api path in a chainable way: 
+  # Canvas.api.course(cid).user(uid).get
+  class API
+    def initialize parts=['/api', 'v1']
+      @parts = parts
+      @inflector = Dry::Inflector.new
+    end
+  
+    def method_missing method, *args, **params, &block
+      # pass a url and params to HTTP methods
+      if [:get, :post, :put].include? method
+        url = @parts.compact.join('/')
+        Canvas.send method, *args.prepend(url), **params
+        
+      # other methods take at least a course_id, so extract it 
+      # from parts and prepend the args with it 
+      elsif Canvas.singleton_methods.include? method
+        ints = @parts.select{|p| p.to_s[/^\d+$/]}
+        Canvas.send method, *ints.concat(args)
+      
+      # keep chaining
+      else
+        if args.empty?
+          API.new(@parts + [method])
+        else
+          API.new(@parts + [@inflector.pluralize(method), args.first])
+        end
+      end
+    end
+  end
+
+  def self.api
+    API.new
   end
 
   # returns everything we need to know about a user
@@ -124,7 +173,7 @@ class Canvas
 
   # this upload the given contents to the course files at the 
   # given path. Make sure the upload is authorized. 
-  def self.upload course_id, path, io
+  def self.upload course_id, path, content
     dirname = File.dirname path
     filename = File.basename path
     parent_id = mkdir course_id, dirname
@@ -135,6 +184,18 @@ class Canvas
       name: filename, 
       parent_folder_id: parent_id
     })
+    
+    io = case content
+    when IO
+      content
+    when Rack::Lint::InputWrapper
+      # Inputs *wrap* a StringIO called @input
+      content.instance_variable_get :@input
+    when String
+      StringIO.new(content)
+    else
+      raise "unknown upload type: #{content.class}"
+    end
 
     upload_url = token['upload_url']
     upload_params = token['upload_params']
@@ -191,7 +252,61 @@ class Canvas
       search_term: filename
     })
     
-    file = files.find {|f| f['display_name'] == filename }
+    file = files.find {|f| f['display_name'] == filename}
     file ? file['id'] : nil
+
+    rescue NotFound
+      nil
+  end
+
+  def self.copy_file course_id, src, dst
+    folder_id = mkdir(course_id, File.dirname(dst))
+
+    file = post("/api/v1/folders/#{folder_id}/copy_file", params: {
+      on_duplicate: 'overwrite',
+      source_file_id: file_id(course_id, src)
+    })
+
+    # rename the file to match dst
+    put "/api/v1/files/#{file['id']}", params: { name: File.basename(dst) }
+
+    # TODO: cache this
+    file['id']
+  end
+
+  # returns the quiz_submission for the given user or nil if there 
+  # isn't one
+  #
+  # once a student starts interacting with a quiz, 
+  # canvas creates a quiz_submission object for that user. it reuses 
+  # that object for each attempt, so we can cache it
+  #
+  # bad news: you can't pull a quiz_submission for a particular user, 
+  # you have to pull all quiz_submissions for that quiz for the entire 
+  # course. So it is important to cache the associations between user_ids  
+  # and quiz_submission ids so that we're not hammering the server
+  #
+  # note: there is a JS endpoint that the speedgrader uses to get 
+  # around this issue, but it's protected by CSRF and not exposed in 
+  # the rest API :( 
+  def self.quiz_submission course_id, quiz_id, user_id
+    submissions_api = api.course(course_id).quiz(quiz_id).submissions
+    submissions = submissions_api.get(paginate: 'quiz_submissions')
+    submissions.find {|submission| submission['user_id'] == user_id.to_i}
+  rescue NotFound 
+    nil
+  end
+
+  # returns a list of gadgets embeded in quiz_id
+  def self.quiz_gadgets course_id, quiz_id
+    regex = /https:\/\/[^\/\s]+\/quiz\/(?<name>[\w\-]+)/io
+    questions = api.course(course_id).quiz(quiz_id).questions.get
+
+    # TODO: cache this
+    questions.filter_map do |question|
+      if match = regex.match(question['question_text'])
+        match['name']
+      end
+    end
   end
 end
