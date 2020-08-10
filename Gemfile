@@ -17,7 +17,7 @@ gem 'concurrent-ruby'
 gem 'connection_pool'
 
 group 'development' do 
-  gem 'pry'
   gem 'rerun'
+  gem 'pry-remote'
   gem 'awesome_print'
 end

@@ -127,13 +127,7 @@ $(() => {
       }
       
       if (admin == false) {
-        // the only time a gadget is read-only is when an admin
-        // is editing a quiz, so they can see hidden files despite 
-        // not being in an owner context 
-        if (readonly == false) {
-          $('.hidden-file-indicator').closest('.tab').hide();
-        }
-
+        $('.hidden-file-indicator').closest('.tab').hide();
         $('.tab-options-link').hide();
         $('.right-options').hide();
         $('#instructionsActions').hide();

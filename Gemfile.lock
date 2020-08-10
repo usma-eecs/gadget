@@ -81,6 +81,9 @@ GEM
     pry (0.13.1)
       coderay (~> 1.1)
       method_source (~> 1.0)
+    pry-remote (0.1.8)
+      pry (~> 0.9)
+      slop (~> 3.0)
     public_suffix (4.0.5)
     puma (4.3.5)
       nio4r (~> 2.0)
@@ -104,6 +107,7 @@ GEM
     slim (4.1.0)
       temple (>= 0.7.6, < 0.9)
       tilt (>= 2.0.6, < 2.1)
+    slop (3.6.0)
     swd (1.2.0)
       activesupport (>= 3)
       attr_required (>= 0.0.5)
@@ -141,7 +145,7 @@ DEPENDENCIES
   ims-lti
   message_bus
   openid_connect
-  pry
+  pry-remote
   puma
   rerun
   roda

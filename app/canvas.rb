@@ -9,6 +9,13 @@ require 'dry/inflector'
 class Canvas
   include Singleton
 
+  # a thread safe pool of persistent canvas connection
+  POOL = ConnectionPool.new(size: 5, timeout: 5) do
+    host = URI::HTTPS.build(host: 'canvas.instructure.com')
+    http = HTTP.persistent(host.to_s)
+    http.auth("Bearer #{ENV['CANVAS_API_TOKEN']}")
+  end
+
   class UpstreamError < StandardError
     attr_reader :status
 
@@ -24,11 +31,42 @@ class Canvas
     end
   end
 
-  # a thread safe pool of persistent canvas connection
-  POOL = ConnectionPool.new(size: 5, timeout: 5) do
-    host = URI::HTTPS.build(host: 'canvas.instructure.com')
-    http = HTTP.persistent(host.to_s)
-    http.auth("Bearer #{ENV['CANVAS_API_TOKEN']}")
+# I couldn't resist putting some totally unnecessary ruby magic 
+  # in here so this builds the api path in a chainable way: 
+  # Canvas.api.course(cid).user(uid).get
+  class API
+    def initialize parts=['/api', 'v1']
+      @parts = parts
+    end
+  
+    def method_missing method, *args, **params, &block
+      # pass a url and params to HTTP methods
+      if [:get, :post, :put].include? method
+        url = @parts.compact.join('/')
+        Canvas.send method, *args.prepend(url), **params
+        
+      # other methods take at least a course_id, so extract it 
+      # from parts and prepend the args with it 
+      elsif Canvas.singleton_methods.include? method
+        ints = @parts.select{|p| p.to_s[/^\d+$/]}
+        Canvas.send method, *ints.concat(args)
+      
+      # keep chaining
+      else
+        if args.empty? or method.to_s.end_with? '!'
+          part = method.to_s.chomp '!'
+        else
+          inflector = Dry::Inflector.new
+          part = inflector.pluralize(method)
+        end
+        
+        API.new(@parts + [part, *args])
+      end
+    end
+  end
+
+  def self.api
+    API.new
   end
 
   def self.request method, *args
@@ -88,51 +126,29 @@ class Canvas
     self.request :put, *args
   end
 
-  # I couldn't resist putting some totally unnecessary ruby magic 
-  # in here so this builds the api path in a chainable way: 
-  # Canvas.api.course(cid).user(uid).get
-  class API
-    def initialize parts=['/api', 'v1']
-      @parts = parts
-      @inflector = Dry::Inflector.new
+  def self.email course_id, user_id
+    user_id = user_id.to_i
+    course_api = api.course(course_id)
+    
+    # so this is a weird endpoint: It returns a page of users
+    # in the course, but only the page that contains user_id, so 
+    # you don't have to worry about pagination
+    users = course_api.search_users.get(params: {user_id: user_id})
+    
+    if user = users.find {|user| user['id'] == user_id}
+      user['email']
     end
-  
-    def method_missing method, *args, **params, &block
-      # pass a url and params to HTTP methods
-      if [:get, :post, :put].include? method
-        url = @parts.compact.join('/')
-        Canvas.send method, *args.prepend(url), **params
-        
-      # other methods take at least a course_id, so extract it 
-      # from parts and prepend the args with it 
-      elsif Canvas.singleton_methods.include? method
-        ints = @parts.select{|p| p.to_s[/^\d+$/]}
-        Canvas.send method, *ints.concat(args)
-      
-      # keep chaining
-      else
-        if args.empty?
-          API.new(@parts + [method])
-        else
-          API.new(@parts + [@inflector.pluralize(method), args.first])
-        end
-      end
-    end
-  end
-
-  def self.api
-    API.new
   end
 
   # returns everything we need to know about a user
   # this is what populates into the gadget servers session hash
   def self.userinfo email
     user_id = nil
-
+    
     # create a mapping of courses with gadgets enabled to dates that those 
     # courses end since we don't allow editing after course end
-    gadget_courses = get('/api/v1/courses').each_with_object({}) do |course, hash|
-      tools = get "/api/v1/courses/#{course['id']}/external_tools"
+    gadget_courses = api.courses.get.each_with_object({}) do |course, hash|
+      tools = api.course(course['id']).external_tools.get
       
       if tools.any? {|tool| tool['consumer_key'] == ENV['LTI_KEY']}
         hash[course['id'].to_s] = { 
@@ -145,7 +161,7 @@ class Canvas
     # a mapping from course ids to booleans indicating if they have
     # elevated privileges in that course (teacher or course designer)
     courses = gadget_courses.each_with_object({}) do |(course_id,course), hash|
-      users = get("/api/v1/courses/#{course_id}/search_users", params: { 
+      users = api.course(course_id).search_users.get(params: { 
         search_term: email,
         'include[]' => 'enrollments'
       })
@@ -161,14 +177,29 @@ class Canvas
       end
     end
 
-    { 'id' => user_id, 'email' => email, 'courses' => courses }
+    { 
+      'id' => user_id, 
+      'email' => email, 
+      'courses' => courses, 
+      'username' => email.split('@').first
+    }
   end
 
-  # returns a downloads url for the given file
-  def self.download_url course_id, path
-    if file_id = file_id(course_id, path)
-      get("/api/v1/files/#{file_id}/public_url")['public_url']
+  # returns a download url for the given file if it exists
+  def self.download_url course_id, path_or_id
+    if path_or_id.is_a? Integer
+      file_id = path_or_id
+    else
+      course_api = api.course(course_id)
+      file_id = course_api.file_id(path_or_id)
     end
+
+    unless file_id.nil?
+      response = api.file(file_id).public_url.get
+      response['public_url']
+    end
+  rescue NotFound
+    nil
   end
 
   # this upload the given contents to the course files at the 
@@ -176,9 +207,11 @@ class Canvas
   def self.upload course_id, path, content
     dirname = File.dirname path
     filename = File.basename path
-    parent_id = mkdir course_id, dirname
 
-    token = post("/api/v1/courses/#{course_id}/files", params: {
+    course_api = api.course(course_id)
+    parent_id = course_api.mkdir dirname
+
+    token = course_api.files.post(params: {
       content_type: 'text/plain',
       on_duplicate: 'overwrite',
       name: filename, 
@@ -186,7 +219,7 @@ class Canvas
     })
     
     io = case content
-    when IO
+    when StringIO, IO
       content
     when Rack::Lint::InputWrapper
       # Inputs *wrap* a StringIO called @input
@@ -209,18 +242,19 @@ class Canvas
   # recursively creates the given path if it doesn't already exist
   # returns the target folder id
   def self.mkdir course_id, path
+    course_api = api.course(course_id)
     path = path.squeeze('/').delete_prefix('/').delete_suffix('/')
     
     # folder exists
-    if id = folder_id(course_id, path)
+    if id = course_api.folder_id(path)
       return id
 
     # create the folder
     else
       dirname = File.dirname path
-      parent_id = mkdir course_id, dirname
+      parent_id = course_api.mkdir dirname
 
-      folder = post("/api/v1/courses/#{course_id}/folders", params: {
+      folder = course_api.folders.post(params: {
         hidden: true, 
         locked: true,
         name: File.basename(path),
@@ -231,12 +265,14 @@ class Canvas
     end
   end
 
-  # this returns the folder id for the given path
-  # it will create the folder if it doesn't exist
+  # this returns the folder id for the given path or nil if not found
   # I'm thinking we should have an id cache. That would improve response time 
   def self.folder_id course_id, path
     path = path.squeeze('/').delete_prefix('/').delete_suffix('/')
-    get("/api/v1/courses/#{course_id}/folders/by_path/#{path}").last['id']
+
+    # the ! tell API not to pluralize
+    files = api.course(course_id).folders.by_path!(path).get
+    files.last['id']
   rescue NotFound
     nil
   end
@@ -246,29 +282,32 @@ class Canvas
   def self.file_id course_id, path
     path = path.squeeze('/').delete_prefix('/').delete_suffix('/')
     filename = File.basename path
-    parent_id = folder_id course_id, File.dirname(path)
 
-    files = get("/api/v1/folders/#{parent_id}/files", params: {
+    course_api = api.course(course_id)
+    parent_id = course_api.folder_id File.dirname(path)
+
+    files = api.folder(parent_id).files.get(params: {
       search_term: filename
     })
     
     file = files.find {|f| f['display_name'] == filename}
     file ? file['id'] : nil
 
-    rescue NotFound
-      nil
+  rescue NotFound
+    nil
   end
 
-  def self.copy_file course_id, src, dst
-    folder_id = mkdir(course_id, File.dirname(dst))
+  def self.copy course_id, src, dst
+    course_api = api.course(course_id)
+    folder_id = course_api.mkdir(File.dirname(dst))
 
-    file = post("/api/v1/folders/#{folder_id}/copy_file", params: {
+    file = api.folder(folder_id).copy_file.post(params: {
       on_duplicate: 'overwrite',
-      source_file_id: file_id(course_id, src)
+      source_file_id: course_api.file_id(src)
     })
 
     # rename the file to match dst
-    put "/api/v1/files/#{file['id']}", params: { name: File.basename(dst) }
+    api.file(file['id']).put(params: { name: File.basename(dst) })
 
     # TODO: cache this
     file['id']
