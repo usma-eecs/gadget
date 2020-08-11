@@ -148,7 +148,7 @@ class Canvas
     # create a mapping of courses with gadgets enabled to dates that those 
     # courses end since we don't allow editing after course end
     gadget_courses = api.courses.get.each_with_object({}) do |course, hash|
-      tools = api.course(course['id']).external_tools.get
+      tools = api.course(course['id']).external_tools.get rescue next
       
       if tools.any? {|tool| tool['consumer_key'] == ENV['LTI_KEY']}
         hash[course['id'].to_s] = { 

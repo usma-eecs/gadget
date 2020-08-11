@@ -39,8 +39,7 @@ class Gadget < Roda
     secret: ENV['SESSION_SECRET'], 
     cookie_options: { same_site: 'None' }
 
-  # TODO: undo this! 
-  # use LTI
+  #use LTI
   use O365
   use SameSite
   use SessionDebugger if ENV['RACK_ENV'] == 'development'
@@ -51,6 +50,14 @@ class Gadget < Roda
       title: 'Gadget Login',
       text: "<script>setTimeout(()=>window.location.href='#{env['PATH_INFO']}',5000)</script>Click the button below to log into your westpoint.edu. The gadget will automatically load once you've logged in.",
       button: { 'Log in with Office 365' => 'javascript:window.open("/o365/login")' }
+    }
+  end
+
+  # r.halt(403) will render this not found page
+  status_handler 403 do
+    render :card, locals: {
+      title: '¯\_(ツ)_/¯', 
+      text: "Sorry, only teachers are allowed to access this page."
     }
   end
 
@@ -66,7 +73,7 @@ class Gadget < Roda
   # I really wanted to use the named_templates for this, 
   # but it kept trying to render locals as html tags producing
   # <gadget>Locked</gadget> and <this>gadget is only ...
-  gadget_locked = Tilt.new('views/card.slim').render(nil,
+  locked = Tilt.new('views/card.slim').render(nil,
     title: 'Gadget Locked', 
     text: 'This gadget is only available during a quiz. There is no quiz in progress or the requested gadget is not included in your quiz.'
   )
@@ -143,31 +150,35 @@ class Gadget < Roda
           gadget_name = generator.generate SecureRandom.uuid
       
           # make sure this gadget name isn't in use in anywhere else
-          files = course_api.files.get(params: { 
-            search_term: "#{gadget_name}.gadget"
-          })
-      
+          files = course_api.files.get(params: { search_term: gadget_name })
           files.empty? ? gadget_name : unique_gadget_name.call()
         end
 
-        gadget_name = unique_gadget_name.call
+        gadget = unique_gadget_name.call
 
         path = case type
-        when 'teacher'
-          path = "gadgets/teacher/#{gadget_name}.gadget"
+        when 'teacher', 'personal'
+          path = "gadgets/#{type}/#{gadget}.gadget"
+        when 'quiz'
+          path = "gadgets/quiz/questions/#{gadget}.gadget"
         when 'student'
-          path = "gadgets/student/#{gadget_name}-#{session['username']}.gadget"
-        when 'personal', 'quiz'
-          path = "gadgets/personal/#{gadget_name}/#{gadget_name}.gadget"
+          filename = "#{session['username']}-#{gadget}.gadget"
+          path = "gadgets/student/#{course_id}/#{filename}"          
         end
 
         # instantiate the gadget by copying the respective template 
-        course_api.copy("gadgets/templates/#{type}.gadget", path)
+        template = "gadgets/template/#{type}.gadget"
+
+        if course_api.file_id(template).nil?
+          course_api.upload(template, File.open("template/#{type}.gadget"))
+        end
+
+        course_api.copy(template, path)
 
         # the gadget now exists, send them to the redirect URL 
         gadget_url = URI::HTTPS.build(
           host: env['HTTP_HOST'],
-          path: "/#{type}/#{gadget_name}"
+          path: "/#{type}/#{gadget}"
         )
 
         return_url = URI(token['return'])
@@ -180,7 +191,8 @@ class Gadget < Roda
         )
         
         # the chooser redirects to the new gadget itself, but 
-        # students don't use the chooser since they don't choose
+        # since students don't chooser, they aren't redirected 
+        # by the chooser, so redirect them here
         if type == 'student'
           r.redirect return_url.to_s
         else
@@ -190,9 +202,9 @@ class Gadget < Roda
     end
 
     # the course id isn't included in a gadget URL since we don't want 
-    # to have to update every gadget URL every time we copy a course
-    # downside: we now have to figure out what course the gadget is in
-    r.is String, String do |gadget_type, gadget_name|
+    # to have to update every gadget URL every time we copy a course. 
+    # the downside: we have to figure out what course the gadget is in
+    r.is String, String do |type, gadget|
 
       # we can get the course id from the Referer header 
       r.on header: 'Referer' do |referer|
@@ -207,17 +219,17 @@ class Gadget < Roda
             # the quiz api mirrors canvas as closely as possible
             if quiz_id = match[:quiz_id]
               if endpoint = match[:endpoint]
-                path = "/#{course_id}/quiz/#{gadget_name}/#{quiz_id}/#{endpoint}"
+                uri_path = "/#{course_id}/quiz/#{gadget}/#{quiz_id}/#{endpoint}"
               else
-                path = "/#{course_id}/quiz/#{gadget_name}/#{quiz_id}"
+                uri_path = "/#{course_id}/quiz/#{gadget}/#{quiz_id}"
               end
 
-              redirect = URI.parse(path)
+              redirect = URI.parse(uri_path)
               redirect.query = uri.query
               
               r.redirect redirect.to_s
             else 
-              r.redirect "/#{course_id}/#{gadget_type}/#{gadget_name}"
+              r.redirect "/#{course_id}/#{type}/#{gadget}"
             end
           end
         end
@@ -237,13 +249,13 @@ class Gadget < Roda
       # gadget-enabled course, we'll assume the gadget is in that course
       elsif session['courses'].one?
         course_id = session['courses'].keys.first
-        r.redirect "#{course_id}/#{gadget_type}/#{gadget_name}"
+        r.redirect "/#{course_id}/#{type}/#{gadget}"
       
       # whelp, that didn't work. Let the user know the situation ...
       else
         course_links = session['courses'].map do |course_id, course_info|
-          gadget_path = "/#{course_id}/#{gadget_type}/#{gadget_name}"
-          course_link = "<a href='#{gadget_path}'>#{course_info['name']}</a>"
+          uri = "/#{course_id}/#{type}/#{gadget}"
+          course_link = "<a href='#{uri}'>#{course_info['name']}</a>"
           "<br>&nbsp;&nbsp;&nbsp;&nbsp;&bull; #{course_link}"
         end.join
         
@@ -273,16 +285,42 @@ class Gadget < Roda
       ends = session.to_hash.dig('courses',course_id,'ends')
       course_ended = ends && DateTime.parse(ends) < DateTime.now
 
+      r.on 'student', String do |gadget|
+        files = course_api.files.get(params: { 
+          search_term: "#{gadget}.gadget" 
+        })
+
+        file = files.first
+        r.halt 404 if file.nil?
+
+        filename = "#{session['username']}-#{gadget}.gadget"
+        owner = file['display_name'] == filename
+        
+        r.get do
+          render :gadget, locals: {
+            admin: owner,
+            save: owner && !course_ended,
+            url: course_api.download_url(file['id']) 
+          }
+        end
+
+        r.post do
+          unless owner && !course_ended
+            r.halt 403, "this gadget is locked for editing" 
+          end
+
+          path = "gadgets/student/#{course_id}/#{filename}"
+          response = course_api.upload(path, r.body)
+          r.halt response.status, response.reason
+        end
+      end
+
       # these are the public gadgets anyone in the class can see
-      r.on ['student', 'teacher'], String do |type, name|
-        path = "gadgets/#{type}/#{name}.gadget"      
+      r.on ['teacher', 'template'], String do |type, gadget|
+        path = "gadgets/#{type}/#{gadget}.gadget"
         r.halt 404 if course_api.file_id(path).nil?
 
-        if type == 'teacher'
-          can_save = role == 'teacher' && !course_ended
-        else
-          can_edit = name.split('-').last == session['id']
-        end
+        can_save = role == 'teacher' && !course_ended
         
         r.get do
           render :gadget, locals: {
@@ -302,55 +340,71 @@ class Gadget < Roda
         end
       end
 
-      r.on 'personal', String do |name|
-        gadget_path = "gadgets/personal/#{name}/#{session['username']}.gadget"
-        template_path = "gadgets/personal/#{name}/#{name}.gadget"
-        r.halt 404 if course_api.file_id(template_path).nil?
+      r.on 'personal', String do |gadget|
+        r.is param: 'user' do |username|
+          r.halt 403 unless role == 'teacher'
 
-        r.get do
-          if course_api.file_id(gadget_path)
-            url = course_api.download_url(gadget_path)
-          else
-            url = course_api.download_url(template_path)
-          end
-
+          path = "gadgets/personal/#{course_id}/#{gadget}/#{username}.gadget"
+          r.halt 404 if course_api.file_id(path).nil?
+          
           render :gadget, locals: {
-            url: url,
-            admin: true,
-            save: !course_ended
+            save: false,
+            admin: false,
+            url: course_api.download_url(path),
           }
         end
 
-        r.post do 
-          r.halt 403, "course ended" if course_ended
-          response = course_api.upload(gadget_path, r.body)
-          r.halt response.status, response.reason
+        r.is do 
+          template = "gadgets/personal/#{gadget}.gadget"
+          r.halt 404 if course_api.file_id(template).nil?
+
+          path = "gadgets/personal/#{course_id}/#{gadget}/#{session['username']}.gadget"
+
+          r.get do
+            if course_api.file_id(path)
+              url = course_api.download_url(path)
+            else
+              url = course_api.download_url(template)
+            end
+
+            render :gadget, locals: {
+              url: url,
+              admin: true,
+              save: !course_ended
+            }
+          end
+
+          r.post do 
+            r.halt 403, "course ended" if course_ended
+            response = course_api.upload(path, r.body)
+            r.halt response.status, response.reason
+          end
         end
       end
 
-      r.on 'quiz', String do |name|
-        template_path = "gadgets/quiz/#{name}/#{name}.gadget"
-        r.halt 404 if course_api.file_id(template_path).nil?
+      r.on 'quiz', String do |gadget|
+        template = "gadgets/quiz/questions/#{gadget}.gadget"
+        r.halt 404 if course_api.file_id(template).nil?
 
         r.is do
           r.redirect File.join(env['PATH_INFO'], 'edit')
         end
 
         # interacting with the quiz question template
-        r.is 'edit' do |name|
-          r.halt(403, gadget_locked) unless role == 'teacher'
+        r.is 'edit' do
+          r.halt(403, locked) unless role == 'teacher'
           
           r.get do
-            render :gadget, locals: { 
-              save: true, 
+            render :gadget, locals: {  
               admin: true, 
-              url: course_api.download_url(template_path)
+              save: !course_ended,
+              url: course_api.download_url(template)
             }
           end
 
           # updating the quiz question template
           r.post do 
-            response = course_api.upload(template_path, r.body)
+            response = course_api.upload(template, r.body)
             r.halt response.status, response.reason
           end
         end
@@ -365,36 +419,41 @@ class Gadget < Roda
             r.halt 404
           end
 
-          r.is do 
-            r.redirect File.join(env['PATH_INFO'], 'history')
-          end
+          quiz_path = "gadgets/quiz/#{course_id}/#{quiz_id}/"
 
           # unlike canvas, you edit gadgets outside the context
           # of a particular quiz. This means that you could embed 
           # the same gadget in multiple quizzes, but when you edit
-          # one - you edit both! 
+          # one - you edit all instances of that gadget! 
           r.on 'edit' do 
-            r.redirect "/#{course_id}/quiz/#{
-              name}/edit"
+            r.halt 403 unless role == 'teacher'
+            r.redirect "/#{course_id}/quiz/#{gadget}/edit"
           end
 
           # teacher is previewing a quiz  
           r.on param: 'preview' do 
+            r.halt 403 unless role == 'teacher'
+
             r.is 'take' do 
               r.redirect 'preview'
             end
             
             # viewing results
             r.get do
+              filename = "#{session['id']}-#{gadget}-preview.gadget"
+              path = File.join(quiz_path, session['username'], filename)
+
               render :gadget, locals: { 
                 save: false,
                 admin: false,
                 readonly: true,
-                url: course_api.download_url(
-                  "gadgets/quiz/#{name}/#{session['username']}/preview.gadget"
-                )
+                url: course_api.download_url(path)
               }
             end
+          end
+
+          r.is do 
+            r.redirect File.join(env['PATH_INFO'], 'history')
           end
 
           r.on 'preview' do 
@@ -404,12 +463,13 @@ class Gadget < Roda
               render :gadget, locals: { 
                 save: true,
                 admin: false,
-                url: course_api.download_url(template_path)
+                url: course_api.download_url(template)
               }
             end
 
             r.post do 
-              path = "gadgets/quiz/#{name}/#{session['username']}/preview.gadget"
+              filename = "#{session['id']}-#{gadget}-preview.gadget"
+              path = File.join(quiz_path, session['username'], filename)
               response = course_api.upload(path, r.body)
               r.halt response.status, response.reason
             end
@@ -420,27 +480,27 @@ class Gadget < Roda
             submission = quiz_api.quiz_submission(session['id'])
           
             # make sure this gadget is included in this quiz
-            unless quiz_api.quiz_gadgets.include? name
-              r.halt 403, gadget_locked
+            unless quiz_api.quiz_gadgets.include? gadget
+              r.halt 403, locked
             end
 
             # make sure that they are currently taking the quiz
             if submission.nil? or submission['workflow_state'] != 'untaken'
-              r.halt 403, gadget_locked 
+              r.halt 403, locked 
             end
             
             attempt = submission['attempt']
             
             # encode the quiz_id in the filename in case this gadget is included in 
             # multiple quizzes - remember that changes to one will change both!
-            # also encode the canvas id so we can search for quiz attempts easily
-            filename = "#{session['id']}-#{quiz_id}-#{attempt}.gadget"
-            submission_path = "gadgets/quiz/#{name}/#{session['username']}/#{filename}"
+            # encode username and id in the path so we can easily search by either
+            filename = "#{session['id']}-#{quiz_id}-#{gadget}-#{attempt}.gadget"
+            attempt_path = File.join(quiz_path, session['username'], filename)
 
-            if course_api.file_id(submission_path).nil?
-              url = course_api.download_url(template_path)
+            if course_api.file_id(attempt_path).nil?
+              url = course_api.download_url(template)
             else
-              url = course_api.download_url(submission_path)
+              url = course_api.download_url(attempt_path)
             end
 
             r.get do
@@ -452,7 +512,7 @@ class Gadget < Roda
             end
 
             r.post do 
-              response = course_api.upload(submission_path, r.body)
+              response = course_api.upload(attempt_path, r.body)
               r.halt response.status, response.reason
             end
           end
@@ -463,14 +523,16 @@ class Gadget < Roda
             
             # a canvas user_id
             if user_id[/^\d+$/]
-              filename = "#{user_id}-#{quiz_id}-#{version}.gadget"
+              filename = "#{user_id}-#{quiz_id}-#{gadget}-#{version}.gadget"
               files = course_api.files.get(params: { search_term: filename })
             
             # a username
             else
-              folder = course_api.folder_kd "gadgets/quiz/#{name}/#{username}"
+              folder = course_api.folder_id File.join(quiz_path, user_id)
+              r.halt 404 if folder.nil?
+
               files = api.folder(folder).files.get params: { 
-                search_term: "#{quiz_id}-#{version}.gadget"
+                search_term: "#{quiz_id}-#{gadget}-#{attempt}.gadget"
               }
             end
 
@@ -491,21 +553,21 @@ class Gadget < Roda
             r.halt 404 if submission.nil?
 
             # make sure they're allowed to view results 
-            r.halt 403, gadget_locked if quiz_info['hide_results']
+            r.halt 403, locked if quiz_info['hide_results']
 
             if quiz_info['one_time_results']
               # they can view their latest attempt if they just finished
               attempt = submission['attempt']
               finished = DateTime.parse submission['fininshed_at']
-              r.halt 403, gadget_locked if finished > 5.minutes.ago
+              r.halt 403, locked if finished > 5.minutes.ago
             else
               attempt = r.GET['attempt'] || submission['attempt']
             end
 
-            filename = "#{session['id']}-#{quiz_id}-#{attempt}.gadget"
-            submission_path = "gadgets/quiz/#{name}/#{session['username']}/#{filename}"
+            filename = "#{session['id']}-#{quiz_id}-#{gadget}-#{attempt}.gadget"
+            attempt_path = File.join(quiz_path, session['username'], filename)
 
-            url = course_api.download_url(submission_path)
+            url = course_api.download_url(attempt_path)
             r.halt 404 if url.nil?
 
             render :gadget, locals: { 
