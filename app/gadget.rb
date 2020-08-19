@@ -39,7 +39,7 @@ class Gadget < Roda
     secret: ENV['SESSION_SECRET'], 
     cookie_options: { same_site: 'None' }
 
-  #use LTI
+  use LTI
   use O365
   use SameSite
   use SessionDebugger if ENV['RACK_ENV'] == 'development'
