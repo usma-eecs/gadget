@@ -1,5 +1,5 @@
 import files from './files';
-import monitoring from './monitoring';
+import monitoring from 'monitoring';
 
 // add the "Gadget Question" question type and the "Insert Gadget" editor button
 export default target => {

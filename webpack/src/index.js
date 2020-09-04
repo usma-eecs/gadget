@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import files from './files';
 import renderer from './renderer';
-import monitoring from './monitoring';
+import monitoring from 'monitoring';
 import insert_gadget_mods from './insert';
 
 // it's expensive to watch for DOM changes, so limit the 

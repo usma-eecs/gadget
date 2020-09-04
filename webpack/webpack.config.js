@@ -6,7 +6,7 @@ module.exports = {
 		inline: false,
 		disableHostCheck: true,
 		contentBase: '../',
-		publicPath: '/canvas/',
+		publicPath: '/canvas/dist/',
 		headers: {
 			"Access-Control-Allow-Origin": "*",
 			"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
