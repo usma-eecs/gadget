@@ -1,115 +1,74 @@
-# LTI Gadget Implementation
+# Canvas Gadgets
 
-This branch contains an implementation for a server that will server gadgets to a free Canvas instance using their LTI and REST interfaces. 
+[Click here for a demo](https://usma-eecs.github.io/gadget/)
 
-This server also hosts an Insecure Chat server for teaching web vulnerabilities and Security Squabble server for teaching personal cyber hygiene. 
+Gadgets let students create, run, and test Python programs in their browser. Gadgets run [Skulpt](https://skulpt.org/), a Javascript implementation of Python 3 and is specifically designed to run in the Canvas LMS. 
 
-## IMPORTANT: Caching
+![](https://i.imgur.com/mL5pKlv.png)
 
-This server uses the Canvas REST API to store gadgets, validate quiz access, and much more. It is probably a good idea to add some aggressive caching to `app/canvas.rb` before using this server in production. 
+## Configuring Canvas
 
-Pro tip: The easiest way to implement caching is probably to add a `cache` method to the `Canvas::API` class in `app/canvas.rb`. For example
+The gadget renderer must be executed on every page containing a gadget. The easiest way to do this in Canvas is to add the renderer script to your school's theme. 
 
-```ruby 
-# bypass the cache
-file_id = Canvas.api.course(12345).file_id('gadgets/templates/personal.gadget')
+Go to *Admin* -> *Themes* and open your school's theme in the Theme Editor. Click the *Upload* tab. Create a new JavaScript file with the code below or add it to your existing JavaScript file: 
 
-# return cached value if exists, store in cache otherwise
-file_id = Canvas.api.course(12345).cache.file_id('gadgets/templates/personal.gadget')
+```javascript
+$.getScript('https://usma-eecs.github.io/gadget/canvas/gadget.bundle.js');
 ```
 
-## Server configuration
+Create a new CSS file with the code below or add it to your existing CSS file: 
 
-Before you can run the server, you must create a `.env` file that has the following: 
+```css
+@import url("https://usma-eecs.github.io/gadget/canvas/gadget.css");
+```
+
+## Gadget serialization
+
+Gadgets are serialized as an HTML `<div>` with the `gadget` class. Each file in the editor is saved in a `<pre>`. Here's an example: 
+
+```html
+<div class="personal gadget">
+  <pre id="main.py"># every gadget must have a main.py</pre>
+  <pre id="instructions.md">
+    # Instructions
+    An instructions tab will appear with HTML instructions rendered from markdown
+  <pre id="tests.py">
+    # put unit tests in tests.py
+  </pre>
+  <pre id="secret.py" class="hidden">
+    # any file with the hidden class is only visible when editing the gadget
+  </pre>
+</div>
+```
+
+## Personal gadgets
+
+Personal gadgets can be customized and saved on a per-user basis. Each user will get a copy of the personal gadget in their personal Canvas files area under the `gadget` folder. To make a gadget a personal gadget, add the `personal` class to the gadget `<div>` like so: 
+
+```html
+<div class="personal gadget">
+  <pre id="main.py"># this is your personal gadget!</pre>
+</div>
+```
+
+## Building the Canvas integration bundle
+
+To update `gadget.bundle.js`, install Node 14.6.0 or greater and run the following: 
 
 ```bash
-# the secret and key to authenticates LTI requests from canvas
-LTI_KEY=
-LTI_SECRET=
-
-# this is the provider Microsoft offers for mult-tenant applications
-OPENID_COMMON_PROVIDER=https://login.microsoftonline.com/common/v2.0
-
-# this is the westpoint.edu's tenant id that will actually respond with authentication information 
-# we need this for validation purposes
-OPENID_TENANT_PROVIDER=https://login.microsoftonline.com/99ff8811-3517-40a9-bf10-45ea0a321f0b/v2.0
-
-# this is the tenant client id and secret an Azure AD app for O365 authentication
-OPENID_CLIENT_ID=
-OPENID_CLIENT_SECRET=
-
-# an API token for a canvas user that must be have a teacher role in every course 
-# containing gadgets 
-CANVAS_API_TOKEN=
-
-# this is used to encrypt session cookies
-SESSION_SECRET=
+$ cd webpack
+$ npm install
+$ npx webpack 
 ```
 
-## Canvas configuration
+This will pack everything in `webpack/src` and any dependecies in `webpack/package.json` into a bundle in the `canvas` directory in the project root. 
 
-Go to Settings -> Apps in your canvas course and add a new app. Select `Paste XML` with the contents from here: 
+## How do gadgets work? 
 
-> https://gadget.it105.army/lti/gadget.xml
+When your school's theme is loaded, the gadget renderer is executed. It uses the [`monitoring`](https://www.npmjs.com/package/monitoring) library to monitor for `<div class="gadgets">` on the page. When it finds one, it instantiates a new `<iframe>` outside the `document.body`. The iframe is here so that it isn't saved into the TinyMCE editor and it is outside the area being monitored for new gadgets for performance.  
 
-## Gadget types
+The iframe contains the actual gadget editor, which lives in this repository. Since the iframe needs to access Canvas (to read and write gadgets) we need a way to get around cross-origin restrictions. Previous iterations of the gadget used the [postMessage protocol](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage), but that was complicated and couldn't reliably save. Instead, the iframe is created with no `src` and its contents are dynamically inserted from [a template](webpack/src/gadget.html) using JavaScript. The template has a `base_uri` that points to this repo where all of its dependent code is loaded from. If Canvas ever tightens up their [Content Security Policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP), this could very well break. 
 
-There are four types of gadgets: 
+Once the iframe is loaded, it places itself over its respective gadget `<div>` and continually monitors the `<div>` so its size and location match the `<div>`'s. Note that the renderer only instantiates iframes for gadgets that are actually visible on the screen. This makes page loading much faster and is freindlier to LockDown browser, but does cause a noticeable delay in the rendering of gadgets. 
 
-* **Quiz gadgets** can only be edited by students during a quiz.
-* **Teacher gadgets** are available to everyone, but can only be edited by teachers.
-* **Student gadgets** are available to everyone, but can only be edited by the student that created them. Student can only create student gadgets. 
-* **Personal gadgets** are a private place for individuals to test and save their code. 
-
-To embed a gadget, you only need its type and name: 
-
-```
-<iframe src="http://gadget.it105.army/<gadget_type>/<gadget_name>" ...>
-```
-
-## Gadget templates
-
-New gadgets are based on their respective gadget type template. Teachers can edit the templates on the gadget server. For example, to edit the quiz gadget template, you would visit: 
-
-```
-https://gadget.it105.army/template/quiz
-```
-
-Every personal gadget has its own template that is based, initially, on the `personal.gadget` template. To edit a particular personal gadget template, visit the `edit` endpoint for that gadget on the server. For example:
-
-```
-https://gadget.it105.army/personal/<gadget-name>/edit
-```
-
-## Gadget storage
-
-Gadgets are stored in the course files of the course they are created in. That means when you clone a course, you get a fresh copy of all the gadgets in it. Here is how they are stored:
-
-```text
-course_files
-└── gadgets
-    ├── template
-    │   ├── quiz.gadget
-    │   ├── teacher.gadget
-    │   ├── student.gadget
-    │   └── personal.gadget
-    ├── teacher
-    │   └── <gadget_name>.gadget
-    ├── student
-    │   └── <user_id>
-    │       └── <username>-<gadget_name>.gadget
-    └── personal
-    │   └── <course_id>
-    │       └── <gadget_name>
-    │           └── <username>.gadget
-    ├── quiz
-    │   └── questions
-    │       └── <gadget_name>.gadget  
-    └────── <course_id>
-            └── <quiz_id>
-                └── <username>
-                    └── <quiz_id>-<user_id>-<gadget_name>-<attempt>.gadget
-   
-```
-
-Gadget names are randomly generated using the [concode gem](https://github.com/DannyBen/concode). I don't recommend renaming them since you would have to go and update every link pointing to that gadget. 
+As edits are made to the code, changes are saved back to the original gadget `<div>` (with about a 1 second debounce). 
