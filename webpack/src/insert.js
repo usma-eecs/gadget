@@ -42,7 +42,7 @@ export default target => {
     )
 
     button.click(() => {
-      const template = 'student.gadget';
+      let template = 'student.gadget';
       const roles = ENV.current_user_roles;
 
       // this is a quiz question
