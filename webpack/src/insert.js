@@ -6,25 +6,30 @@ export default target => {
   const monitor = monitoring(target);
 
   // add the "Gadget Question" type to the quiz editor
-  monitor.added('.question_holder select.question_type', select => {
-    const question = $(select).closest('.question');
-    const content = question.find('.question_content');
-    const option = $("<option value='essay_question'>Gadget Question</option>");
+  monitor.added('.question_holder', holder => {
+    monitoring(holder).added('select.question_type', select => {
+      const question = $(select).closest('.question');
+      const content = question.find('.question_content');
+      const option = $("<option value='essay_question'>Gadget Question</option>");
 
-    // the editor might not be instantiated yet, so we can't check its DOM 
-    // for gadget object. Instead, we'll just scan the pre-exisiting content
-    // for a div that the word gadget in its opening tag somewhere
-    if (content.val().match('<div[^<]+gadget[^<]+>') != null) {
-      option.attr('selected', true);
-    }
-
-    $(select).append(option).change(() => {
-      if ($(select).find('option:selected').text() == 'Gadget Question') {
-        files.get(ENV.CONTEXT_URL_ROOT, 'quiz.gadget', gadget => {
-          tinymce.get(content.attr('id')).rceWrapper.insert_code(gadget)
-        });
+      // the editor might not be instantiated yet, so we can't check its DOM 
+      // for gadget object. Instead, we'll just scan the pre-exisiting content
+      // for a div that the word gadget in its opening tag somewhere
+      if (content.val().match('<div[^<]+gadget[^<]+>') != null) {
+        option.attr('selected', true);
       }
-    });   
+
+      $(select).append(option).change(() => {
+        if ($(select).find('option:selected').text() == 'Gadget Question') {
+          files.get(`courses/${ENV.COURSE_ID}`, 'templates/quiz.gadget').then(gadget => {
+            tinymce.get(content.attr('id')).rceWrapper.insert_code(gadget)
+          });
+        }
+      });
+
+      // stop monitoring this holder
+      return false;
+    });
   });
 
   // add the "Insert Gadget" editor button 
@@ -42,19 +47,19 @@ export default target => {
     )
 
     button.click(() => {
-      let template = 'student.gadget';
+      let template = 'templates/student.gadget';
       const roles = ENV.current_user_roles;
 
       // this is a quiz question
       if ($(editor).closest('.question').length) {
-        template = 'quiz.gadget';
+        template = 'templates/quiz.gadget';
       } else if (roles.includes("teacher") || roles.includes("admin")) {
-        template = 'teacher.gadget';
+        template = 'templates/teacher.gadget';
       }
 
-      files.get(ENV.CONTEXT_URL_ROOT, template, gadget => {
-        tinymce.get(id).rceWrapper.insert_code(gadget)
-      });
+      files.get(`courses/${ENV.COURSE_ID}`, template).then(gadget => 
+        tinymce.activeEditor.rceWrapper.insert_code(gadget)
+      );
     });
 
     // we remove the left-to-right and right-to-left buttons

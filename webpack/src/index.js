@@ -7,7 +7,7 @@ import insert_gadget_mods from './insert';
 // it's expensive to watch for DOM changes, so limit the 
 // elements we monitor to the greatest extent possible
 monitoring(document).added('#content', content => {
-  console.log("loading gadget support");
+  console.log("loading gadget support ...");
 
   // add the "Gadget Question" question type and the "Insert Gadget" editor button
   insert_gadget_mods(content);
@@ -33,7 +33,7 @@ monitoring(document).added('#content', content => {
           // we only save the innerHTML of personal gadgets
           const data = app.toElement().innerHTML;
 
-          // must return a promise, so the configure script 
+          // must return a promise to the configure script 
           // so it can update interface elements accordingly
           return files.put(userContext, path, data);
         }

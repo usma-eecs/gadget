@@ -15,7 +15,7 @@ export default {
   // ALSO NOTE: If the file is not found, a warning is produced 
   // on the console and the callback is never called, but no 
   // error is thrown
-  get: (context, file_path, callback) => {
+  get: (context, file_path) => {
     var dirname = path.dirname(file_path);
     var filename = path.basename(file_path);
 

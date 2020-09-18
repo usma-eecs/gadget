@@ -22,6 +22,8 @@ Create a new CSS file with the code below or add it to your existing CSS file:
 @import url("https://usma-eecs.github.io/gadget/canvas/gadget.css");
 ```
 
+You will also need to copy the `templates` folder in this repo to your *Course Files* directory in Canvas. If you cloned the course from an old Gadget-enabled course, then it should already be there. **Note**: It is important that the folder is names `templates`. 
+
 ## Gadget serialization
 
 Gadgets are serialized as an HTML `<div>` with the `gadget` class. Each file in the editor is saved in a `<pre>`. Here's an example: 

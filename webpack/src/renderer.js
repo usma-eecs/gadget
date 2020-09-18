@@ -4,7 +4,7 @@ import gadget_html from 'raw-loader!./gadget.html';
 
 // TODO: remove jseval when eval'ing main
 export default (target, configure) => {
-  console.log("renderer loaded");
+  console.log("gadget renderer ready");
   const monitor = monitoring(target, {iframes: true});
 
   // this resize observer monitors gadget divs and resizes 
@@ -26,9 +26,11 @@ export default (target, configure) => {
   monitor.appeared("div.gadget", gadget => {
     // the gadget has already been rendered, so just show it
     if (gadget.config) {
+      console.log("repeat gadget");
       $(gadget.config.iframeElement).show();
       $(gadget.config.iframeElement).css({'z-index': 10});
     } else {
+      console.log("new gadget");
       gadget.config = {};
     
       const iframe = $('<iframe>', {
