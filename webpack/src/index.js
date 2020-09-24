@@ -3,7 +3,7 @@ import files from './files';
 import renderer from './renderer';
 import monitoring from 'monitoring';
 import insert_gadget_mods from './insert';
-
+window.monitoring = monitoring; 
 // it's expensive to watch for DOM changes, so limit the 
 // elements we monitor to the greatest extent possible
 monitoring(document).added('#content', content => {

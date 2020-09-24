@@ -26,11 +26,9 @@ export default (target, configure) => {
   monitor.appeared("div.gadget", gadget => {
     // the gadget has already been rendered, so just show it
     if (gadget.config) {
-      console.log("repeat gadget");
       $(gadget.config.iframeElement).show();
       $(gadget.config.iframeElement).css({'z-index': 10});
     } else {
-      console.log("new gadget");
       gadget.config = {};
     
       const iframe = $('<iframe>', {
@@ -52,7 +50,9 @@ export default (target, configure) => {
         'z-index': 10,
         top: offsets.top, 
         left: offsets.left,
-        position: 'absolute'
+        position: 'absolute',
+        width: $(gadget).css('width'), 
+        height: $(gadget).css('height')
       });
 
       // make sure the gadgets and its iframe can find each other
