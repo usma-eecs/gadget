@@ -88,7 +88,11 @@ monitoring(document).added('#content', content => {
       // editor itself. annoying. 
       else if (window.tinymce) {
         const editor = tinymce.get(input.attr('id'));
-        gadget.innerHTML = $(editor.getContent())[0].innerHTML;
+        const draft = editor.getContent();
+
+        if (draft) {
+          gadget.innerHTML = $(draft)[0].innerHTML;
+        }
       }
 
       render();
