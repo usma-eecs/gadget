@@ -65,6 +65,23 @@ $ npx webpack
 
 This will pack everything in `webpack/src` and any dependecies in `webpack/package.json` into a bundle in the `canvas` directory in the project root. 
 
+## Development Mode
+
+To configure Chrome to render gadgets using your webpack development server instead of the production copy in Github, do the following: 
+
+1. Clone the project, open the `webpack` folder, type `npm install`, then `npm start` to start the webpack development server. 
+2. Open Canvas in Chrome and head to a page with a gadget then open Developer Tools.
+3. Go to `Sources` tab, then the `Overrides` sub-tab and add an [overrides folder](https://developers.google.com/web/updates/2018/01/devtools#overrides). 
+4. Go to the `Sources` tab then the `Page` sub-tab and find the Javascript integration hook. It's usually on a server starting with `instructure-uploads`. Change the hook to load the bundle from your development server. It should look something like this when you're done:
+
+```
+$.getScript('http://localhost:9292/canvas/gadget.bundle.js');
+```
+
+If you configured overrides correctly, you should be able to save your change and it will persist. 
+
+Now you can edit the files in `webpack/src` and see those changes in Canvas. When you're done, re-build the bundle and push it to Github. 
+
 ## How do gadgets work? 
 
 When your school's theme is loaded, the gadget renderer is executed. It uses the [`monitoring`](https://www.npmjs.com/package/monitoring) library to monitor for `<div class="gadgets">` on the page. When it finds one, it instantiates a new `<iframe>` outside the `document.body`. The iframe is here so that it isn't saved into the TinyMCE editor and it is outside the area being monitored for new gadgets for performance.  
