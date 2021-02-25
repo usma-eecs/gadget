@@ -33,20 +33,26 @@ export default target => {
   });
 
   // add the "Insert Gadget" editor button 
-  monitor.added('.mce-tinymce', editor => {
-    const button = $("<div>", { 
-        role: 'button',
-        class: 'mce-widget mce-btn',
-      }).append($("<button>", { 
-        role: 'presentation',
-        type:'button'
-      }).append($("<i>")
-        .addClass("mce-ico mce-i-none")
-        .css("background-image", "url('https://i.imgur.com/V88UPuK.png')")
-      )
-    )
+  monitor.added('.tox-tinymce', editor => {
+    
+    tinymce.get(0).ui.registry.addButton("additem", {
+      text: "Add item",
+      onAction: () => alert("clci")
+    });    
+    
 
-    button.click(() => {
+    const button = $("<button>", { 
+        type: "button",
+        title: "Insert Gadget Editor",
+        tabindex: "-1",
+        class: 'tox-tbtn',
+        "aria-label": "Insert Gadget Editor"
+      }).append($("<img>", { 
+        src: 'https://i.imgur.com/V88UPuK.png'
+      })
+    );
+
+    button.on('click', () => {
       let template = 'templates/student.gadget';
       const roles = ENV.current_user_roles;
 
@@ -62,9 +68,9 @@ export default target => {
       );
     });
 
-    // we remove the left-to-right and right-to-left buttons
-    // ... hopefully no one needed those ... ¯\_(ツ)_/¯
-    $(editor).find('.mce-btn:has(.mce-i-rtl)').remove();
-    $(editor).find('.mce-btn:has(.mce-i-ltr)').replaceWith(button);
+    // add the gadget button as the very last icon in the toolbar
+    $(editor)
+      .find('.tox-toolbar__primary > div:last-child')
+      .prepend(button);
   });
 }

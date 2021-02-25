@@ -3,7 +3,7 @@ import files from './files';
 import renderer from './renderer';
 import monitoring from 'monitoring';
 import insert_gadget_mods from './insert';
-window.monitoring = monitoring; 
+
 // it's expensive to watch for DOM changes, so limit the 
 // elements we monitor to the greatest extent possible
 monitoring(document).added('#content', content => {
@@ -22,7 +22,6 @@ monitoring(document).added('#content', content => {
       if (!gadget.id) {
         console.log("can't render a personal gadget without an id!");
       } else {
-        
         gadget.config.admin = true;
         const userContext = `/users/${ENV.current_user.id}`;
         const path = `gadgets/${gadget.id}.gadget`;
@@ -69,7 +68,7 @@ monitoring(document).added('#content', content => {
 
       gadget.config.edit = app => {
         // find the tinymce editor for this quesiton
-        const editor = tinymce.get(input.attr('id'))
+        const editor = tinymce.get(input.attr('id'));
         
         // send the gadget code to the editor and tell it to save
         editor.setContent(app.toHTML());
@@ -77,9 +76,23 @@ monitoring(document).added('#content', content => {
       }
             
       // they are continuing this question from a draft
+      // if the tinymce editor for this essay question hasn't 
+      // loaded yet, the draft will be in the input textarea
       if (input.val()) {
         const draft = $(input.val()).get(0);
         gadget.innerHTML = draft.innerHTML;
+      } 
+      
+      // if the tinymce editor *has* loaded, the textarea will
+      // be empty and you have to request the content from the 
+      // editor itself. annoying. 
+      else if (window.tinymce) {
+        const editor = tinymce.get(input.attr('id'));
+        const draft = editor.getContent();
+
+        if (draft) {
+          gadget.innerHTML = $(draft)[0].innerHTML;
+        }
       }
 
       render();
